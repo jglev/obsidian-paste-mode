@@ -117,12 +117,11 @@ export default class MyPlugin extends Plugin {
 			const clipboardTextIndented = clipboardText.replaceAll(
 				/\n/g, '\n' + leadingWhitespace + prepend);
 			console.log(102, clipboardTextIndented);
-			view.sourceMode.editor.setLine(
-				currentCursor.line,
-					currentLineText.substring(0, currentCursor.ch) + 
-					prepend + 
-					clipboardTextIndented + 
-					currentLineText.substring(currentCursor.ch,)
+			const replacementText = prepend + 
+					clipboardTextIndented;
+			view.sourceMode.editor.replaceSelection(
+				replacementText,
+				'start'
 			);
 
 			return;
