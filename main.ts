@@ -1,4 +1,4 @@
-import { App, MarkdownView, Modal, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 
 interface MyPluginSettings {
 	mySetting: string;
@@ -7,6 +7,8 @@ interface MyPluginSettings {
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
+
+const quoteMarker = '> '
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
@@ -64,7 +66,23 @@ export default class MyPlugin extends Plugin {
 				if (view) {
 					if (!checking && view instanceof MarkdownView) {
 						console.log('Pasting quote...');
-						this.pasteText(view, '> ');
+						this.pasteText(view, quoteMarker);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addCommand({
+			id: 'toggle-quote-at-current-indentation',
+			name: 'Toggle quote at current indentation',
+			checkCallback: (checking: boolean) => {
+				let view = this.app.workspace.activeLeaf.view;
+				if (view) {
+					if (!checking && view instanceof MarkdownView) {
+						console.log('Toggling quote...');
+						this.toggleQuote(view, quoteMarker);
 					}
 					return true;
 				}
@@ -127,7 +145,26 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 
-		console.log('Nothing to paste from the clipboard!')
+		new Notice('The clipboard is currently empty.');
+	}
+
+	async toggleQuote(view: MarkdownView, prepend: string = quoteMarker) {
+		const currentSelection = view.sourceMode.editor.getSelection();
+		const toggledSelection = currentSelection.replaceAll(
+			/\n(\s*)/g, '\n$1' + prepend);
+		
+			view.sourceMode.editor.replaceSelection(
+				toggledSelection,
+				'start'
+			);
+
+			// Also toggle the current cursor line:
+			const currentLine = view.sourceMode.editor.getCursor().line;
+			const currentLineText = view.sourceMode.editor.getLine(currentLine);
+			view.sourceMode.editor.setLine(
+				currentLine,
+				currentLineText.replace(/^(\s*)/, '$1' + prepend)
+			);
 	}
 
 	// onunload() {
