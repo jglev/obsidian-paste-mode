@@ -94,15 +94,19 @@ export default class MyPlugin extends Plugin {
 		const clipboardText = await navigator.clipboard.readText();
 		if (clipboardText !== '') {
 			console.log(95, clipboardText);
-			const currentLineNumber = view.sourceMode.editor.getCursor().line;
-			const currentLineText = view.sourceMode.editor.getLine(currentLineNumber);
+			const currentCursor = view.sourceMode.editor.getCursor();
+			const currentLineText = view.sourceMode.editor.getLine(currentCursor.line);
 			const leadingWhitespace = currentLineText.match(/^(\s*).*/)[1];
 			console.log(97, leadingWhitespace);
 			const clipboardTextIndented = clipboardText.replaceAll(
-				/\n/, `\n${leadingWhitespace}`);
+				/\n/g, `\n${leadingWhitespace}`);
 			console.log(102, clipboardTextIndented);
 			view.sourceMode.editor.setLine(
-				currentLineNumber, currentLineText + clipboardTextIndented);
+				currentCursor.line,
+				currentLineText.substring(0, currentCursor.ch) + 
+					clipboardTextIndented + 
+					currentLineText.substring(currentCursor.ch,)
+			);
 
 			return;
 		}
