@@ -47,8 +47,24 @@ export default class MyPlugin extends Plugin {
 				let view = this.app.workspace.activeLeaf.view;
 				if (view) {
 					if (!checking && view instanceof MarkdownView) {
-						console.log('Pasting...');
+						console.log('Pasting text...');
 						this.pasteText(view);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		this.addCommand({
+			id: 'paste-quote-to-current-indentation',
+			name: 'Paste quote to current indentation',
+			checkCallback: (checking: boolean) => {
+				let view = this.app.workspace.activeLeaf.view;
+				if (view) {
+					if (!checking && view instanceof MarkdownView) {
+						console.log('Pasting quote...');
+						this.pasteText(view, '> ');
 					}
 					return true;
 				}
@@ -90,7 +106,7 @@ export default class MyPlugin extends Plugin {
 		// this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	async pasteText(view: MarkdownView) {
+	async pasteText(view: MarkdownView, prepend: string = '') {
 		const clipboardText = await navigator.clipboard.readText();
 		if (clipboardText !== '') {
 			console.log(95, clipboardText);
@@ -99,11 +115,12 @@ export default class MyPlugin extends Plugin {
 			const leadingWhitespace = currentLineText.match(/^(\s*).*/)[1];
 			console.log(97, leadingWhitespace);
 			const clipboardTextIndented = clipboardText.replaceAll(
-				/\n/g, `\n${leadingWhitespace}`);
+				/\n/g, '\n' + leadingWhitespace + prepend);
 			console.log(102, clipboardTextIndented);
 			view.sourceMode.editor.setLine(
 				currentCursor.line,
-				currentLineText.substring(0, currentCursor.ch) + 
+					currentLineText.substring(0, currentCursor.ch) + 
+					prepend + 
 					clipboardTextIndented + 
 					currentLineText.substring(currentCursor.ch,)
 			);
