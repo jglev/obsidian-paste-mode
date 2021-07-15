@@ -1,57 +1,68 @@
-## Obsidian Sample Plugin
+## Obsidian Paste to Current Indentation Plugin
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An [Obsidian](https://obsidian.md/) plugin to paste and manage block quotes that are indented. This plugin helps especially with embedding code, quotes, and other content within lists.
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+![Paste text](img/paste_text.gif)
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+The plugin can paste text as a block quote:
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+![Paste block quote](img/paste_blockquote.gif)
 
-### First time developing plugins?
+Block quote markers can be toggled on and off for indented text:
 
-Quick starting guide for new plugin devs:
+![Toggle block quote marker](img/toggle_blockquote.gif)
+![Toggle block quote marker with irregularly-indented text](img/toggle_sub-blockquote.gif)
 
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
+Block quote markers are customizable via a Settings tab (e.g., if you prefer to use spaces instead of `> `):
+
+![Settings tab](img/settings_tab.gif)
+
+# Roadmap
+
+I consider this plugin feature-complete for now.
+
+Todo: 
+
+- Add tests
+
+# Developing this plugin
+
+The documentation below is retained from the [Obsidian Sample Plugin](https://github.com/obsidianmd/obsidian-sample-plugin).
+
+## Quickstart guide for development
+
+- Clone this repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
 - Install NodeJS, then run `npm i` in the command line under your repo folder.
 - Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
 - Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
+- Reload Obsidian to load the new version of the plugin.
 - Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+- For updates to the Obsidian API run `npm update` in the command line under this repo's folder.
 
-### Releasing new releases
+## Releasing new releases
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
+- Update `manifest.json` with the new version number, such as `1.0.1`, and the minimum Obsidian version required for the latest release.
+- Update the `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of the plugin that's compatible.
+- Create new GitHub release using the new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
 - Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments.
 - Publish the release.
 
-### Adding your plugin to the community plugin list
+## Adding the plugin to the community plugin list
 
 - Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+- Make sure you have a `README.md` file in the root of the repo.
+- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add the plugin.
 
-### How to use
+## How to use when developing
 
 - Clone this repo.
 - `npm i` or `yarn` to install dependencies
 - `npm run dev` to start compilation in watch mode.
 
-### Manually installing the plugin
+## Manually installing the plugin
 
 - Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
 
-### API Documentation
+## API Documentation
 
 See https://github.com/obsidianmd/obsidian-api
