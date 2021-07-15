@@ -149,22 +149,59 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async toggleQuote(view: MarkdownView, prepend: string = quoteMarker) {
-		const currentSelection = view.sourceMode.editor.getSelection();
-		const toggledSelection = currentSelection.replaceAll(
-			/\n(\s*)/g, '\n$1' + prepend);
-		
+		const currentSelectionStart = view.sourceMode.editor.getCursor('from');
+		const currentSelectionEnd = view.sourceMode.editor.getCursor('end');
+		console.log(155, currentSelectionStart, currentSelectionEnd);
+		const currentLineText = view.sourceMode.editor.getLine(
+			currentSelectionStart.line
+		);
+
+		// If we have a multi-line selection:
+		if (currentSelectionStart.line !== currentSelectionEnd.line) {
+			const currentSelection = view.sourceMode.editor.getSelection();
+			
+			const toggledSelection = currentSelection.replaceAll(
+				/\n(\s*)(.*)/g, (
+					match: string,
+					p1: string,
+					p2: string
+				) => {
+					console.log(161, match, p1, p2);
+					if (p2.startsWith(prepend.trimStart())) {
+						console.log(171);
+						return '\n' + p1 + p2.replace(prepend, '');
+					}
+					console.log(174);
+					return '\n' + p1 + prepend+ p2;
+				}
+			);
+			
 			view.sourceMode.editor.replaceSelection(
 				toggledSelection,
 				'start'
 			);
+		}
 
-			// Also toggle the current cursor line:
-			const currentLine = view.sourceMode.editor.getCursor().line;
-			const currentLineText = view.sourceMode.editor.getLine(currentLine);
+		if (currentLineText
+					.match(/^(\s*)(.*)/)[2]
+					.startsWith(prepend.trimStart())
+		) {
+			// If there is already a quote marker at the start of the line,
+			// remove it:
+			console.log(184);
 			view.sourceMode.editor.setLine(
-				currentLine,
+				currentSelectionStart.line,
+				currentLineText.replace(prepend, '' )
+			);
+		} else {
+			// If there not already a quote marker at the start of the line,
+			// add it:
+			console.log(190);
+			view.sourceMode.editor.setLine(
+				currentSelectionStart.line,
 				currentLineText.replace(/^(\s*)/, '$1' + prepend)
 			);
+		}
 	}
 
 	// onunload() {
