@@ -134,7 +134,7 @@ export default class MyPlugin extends Plugin {
 		// this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	async pasteText(view: MarkdownView, prepend: string = '') {
+	async pasteText(view: MarkdownView, prefix: string = '') {
 		const clipboardText = await navigator.clipboard.readText();
 		if (clipboardText !== '') {
 			console.log(95, clipboardText);
@@ -143,9 +143,9 @@ export default class MyPlugin extends Plugin {
 			const leadingWhitespace = currentLineText.match(/^(\s*).*/)[1];
 			console.log(97, leadingWhitespace);
 			const clipboardTextIndented = clipboardText.replaceAll(
-				/\n/g, '\n' + leadingWhitespace + prepend);
+				/\n/g, '\n' + leadingWhitespace + prefix);
 			console.log(102, clipboardTextIndented);
-			const replacementText = prepend + 
+			const replacementText = prefix + 
 					clipboardTextIndented;
 			view.sourceMode.editor.replaceSelection(
 				replacementText,
@@ -158,8 +158,8 @@ export default class MyPlugin extends Plugin {
 		new Notice('The clipboard is currently empty.');
 	}
 
-	async toggleQuote(view: MarkdownView, prepend: string = quoteMarker) {
-		const escapedPrepend = escapeRegExp(prepend);
+	async toggleQuote(view: MarkdownView, prefix: string = quoteMarker) {
+		const escapedPrefix = escapeRegExp(prefix);
 		const currentSelectionStart = view.sourceMode.editor.getCursor('from');
 		const currentSelectionEnd = view.sourceMode.editor.getCursor('end');
 		console.log(
@@ -197,14 +197,14 @@ export default class MyPlugin extends Plugin {
 		console.log(192, leadingWhitespaces, minLeadingWhitespaceLength);
 		console.log(198, fullSelectedLines);
 
-		// Determine whether *every* line is prepended or not. If not, we will
-		// add the prepend to every line; if so, we will remove it from every line.
-		const isEveryLinePrepended = fullSelectedLines.every(
+		// Determine whether *every* line is Prefixed or not. If not, we will
+		// add the prefix to every line; if so, we will remove it from every line.
+		const isEveryLinePrefixed = fullSelectedLines.every(
 			(e: string) => {
-				const prependMatch = e.match(
-					new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrepend}`)
+				const prefixMatch = e.match(
+					new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
 				);
-				if (prependMatch !== null) {
+				if (prefixMatch !== null) {
 					return true;
 				}
 				return false;
@@ -213,19 +213,19 @@ export default class MyPlugin extends Plugin {
 
 		// Update the text in-place:
 		for (const [i, text] of fullSelectedLines.entries()) {
-			if (isEveryLinePrepended === true) {
+			if (isEveryLinePrefixed === true) {
 				fullSelectedLines[i] = text.replace(
-					new RegExp(`^(\\s{${minLeadingWhitespaceLength}})${escapedPrepend}`),
+					new RegExp(`^(\\s{${minLeadingWhitespaceLength}})${escapedPrefix}`),
 					'$1'
 					)
 			} else {
-				// If the prepend is already in the correct place, do not add to it:
+				// If the prefix is already in the correct place, do not add to it:
 				if (!text.match(
-					new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrepend}`)
+					new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
 				)) {
 					fullSelectedLines[i] = text.replace(
 						new RegExp(`^(\\s{${minLeadingWhitespaceLength}})`),
-						`$1${prepend}`
+						`$1${prefix}`
 					)
 				}
 			}
@@ -242,15 +242,15 @@ export default class MyPlugin extends Plugin {
 		view.sourceMode.cmEditor.setSelection(
 			{
 				line: currentSelectionStart.line,
-				ch: isEveryLinePrepended ? 
-					currentSelectionStart.ch - prepend.length: 
-					currentSelectionStart.ch + prepend.length
+				ch: isEveryLinePrefixed ? 
+					currentSelectionStart.ch - prefix.length: 
+					currentSelectionStart.ch + prefix.length
 			},
 			{
 				line: currentSelectionEnd.line,
-				ch: isEveryLinePrepended ? 
-					currentSelectionEnd.ch - prepend.length: 
-					currentSelectionEnd.ch + prepend.length
+				ch: isEveryLinePrefixed ? 
+					currentSelectionEnd.ch - prefix.length: 
+					currentSelectionEnd.ch + prefix.length
 			},
 			{
 				origin: '+input'
