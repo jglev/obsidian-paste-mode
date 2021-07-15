@@ -239,119 +239,26 @@ export default class MyPlugin extends Plugin {
 			replacementRange[1]
 		);
 
+		view.sourceMode.cmEditor.setSelection(
+			{
+				line: currentSelectionStart.line,
+				ch: isEveryLinePrepended ? 
+					currentSelectionStart.ch - prepend.length: 
+					currentSelectionStart.ch + prepend.length
+			},
+			{
+				line: currentSelectionEnd.line,
+				ch: isEveryLinePrepended ? 
+					currentSelectionEnd.ch - prepend.length: 
+					currentSelectionEnd.ch + prepend.length
+			},
+			{
+				origin: '+input'
+			}
+		);
+
 		return
-
-		// 	if (text.match(
-		// 		new RegExp(
-		// 			`^(\\s{${minLeadingWhitespaceLength}})(${escapedPrepend})`)
-		// 	)) {
-		// 		// There is not a prepend instance at the correct position, so we'll
-		// 		// add one:
-		// 		return text.replace(
-		// 			new RegExp(`^(\\s{${minLeadingWhitespaceLength}})`),
-		// 			`$1${prepend}`
-		// 		)
-		// 	}
-
-		// 	// There IS a prepend instance at the correct position, so we'll remove
-		// 	// it:
-		// 	return text.replace(
-		// 		new RegExp(`^(\\s{0,${minLeadingWhitespaceLength}})${escapedPrepend}`),
-		// 		`$1`
-		// 	)
-
-		// return
-		
-		// const currentLineText = view.sourceMode.editor.getLine(
-		// 	currentSelectionStart.line
-		// );
-		// console.log(158, currentLineText);
-
-		// let minLeadingWhitespaceLength = currentLineText.match(/^\s*/)[0].length;
-
-		// // If we have a multi-line selection:
-		// if (currentSelectionStart.line !== currentSelectionEnd.line) {
-		// 	const currentSelection = view.sourceMode.editor.getSelection();
-		// 	let leadingWhitespaces = [];
-		// 	const selectionLeadingWhitespace = currentLineText.match(/^\n*\s*/);
-		// 	if (selectionLeadingWhitespace !== null) {
-		// 		leadingWhitespaces.push(selectionLeadingWhitespace[0]);
-		// 	} else {
-		// 		leadingWhitespaces.push('');
-		// 	}
-		// 	leadingWhitespaces = [
-		// 		...leadingWhitespaces,
-		// 		...[...currentSelection.matchAll(/\n(\s*)/g)].map(
-		// 			(e: Array<string>) => e[1]
-		// 		)
-		// 	]
-
-		// 	minLeadingWhitespaceLength = Math.min.apply(
-		// 		null,
-		// 		leadingWhitespaces.map((e: Array<string>) => e.length)
-		// 	);
-
-		// 	console.log(182, leadingWhitespaces, minLeadingWhitespaceLength);
-			
-		// 	const toggledSelection = currentSelection.replaceAll(
-		// 		new RegExp(
-		// 			`\n(\\s{0,${minLeadingWhitespaceLength}})(\\s*)(.*)`, 'g'), (
-		// 			match: string,
-		// 			p1: string,
-		// 			p2: string,
-		// 			p3: string
-		// 		) => {
-		// 			console.log(161, match, p1, p2, p3);
-		// 			if (p2 === '' && p3.startsWith(prepend.trimStart())) {
-		// 				console.log(171);
-		// 				return '\n' + p1 + p2 + p3.replace(prepend, '');
-		// 			}
-		// 			console.log(174);
-		// 			return '\n' 
-		// 				// Account for use of spaces OR tabs, vs. just statically using 
-		// 				// one or the other:
-		// 				+ p1
-		// 				+ prepend 
-		// 				+ p2
-		// 				+ p3;
-		// 		}
-		// 	);
-			
-		// 	view.sourceMode.editor.replaceSelection(
-		// 		toggledSelection,
-		// 		'start'
-		// 	);
-		// }
-
-		// if (currentLineText
-		// 	.match(/^\n*(\s*)(.*)/)[2]
-		// 	.startsWith(prepend.trimStart())
-		// ) {
-		// 	// If there is already a quote marker at the start of the line,
-		// 	// remove it:
-		// 	console.log(184);
-		// 	view.sourceMode.editor.setLine(
-		// 		currentSelectionStart.line,
-		// 		currentLineText.replace(prepend, '' )
-		// 	);
-		// } else {
-		// 	// If there not already a quote marker at the start of the line,
-		// 	// add it:
-		// 	console.log(190);
-		// 	view.sourceMode.editor.setLine(
-		// 		currentSelectionStart.line,
-		// 		currentLineText.replace(
-		// 			new RegExp(`(\\s{0,${minLeadingWhitespaceLength}})`),
-		// 			'$1' 
-		// 			+ prepend
-		// 		)
-		// 	);
-		// }
 	}
-
-	// onunload() {
-	// 	console.log('unloading plugin');
-	// }
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
