@@ -17,6 +17,14 @@ Block quote markers are customizable via a Settings tab (e.g., if you prefer to 
 
 ![Settings tab](img/settings_tab.gif)
 
+# Roadmap
+
+I consider this plugin feature-complete for now.
+
+Todo: 
+
+- Add tests
+
 # Developing this plugin
 
 The documentation below is retained from the [Obsidian Sample Plugin](https://github.com/obsidianmd/obsidian-sample-plugin).
