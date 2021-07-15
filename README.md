@@ -15,7 +15,7 @@ Block quote markers can be toggled on and off for indented text:
 
 Block quote markers are customizable via a Settings tab (e.g., if you prefer to use spaces instead of `> `):
 
-![Settings tab](img/settings_tab.gif)
+![Settings tab](img/settings_tab.png)
 
 # Roadmap
 
