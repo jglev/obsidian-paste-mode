@@ -31,12 +31,10 @@ export default class PastetoIndentationPlugin extends Plugin {
 			id: 'paste-text-to-current-indentation',
 			name: 'Paste text to current indentation',
 			checkCallback: (checking: boolean) => {
-				let view = this.app.workspace.activeLeaf.view;
+				let view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
 					if (!checking) {
-						if (view instanceof MarkdownView) {
-							this.pasteText(view);
-						}
+						this.pasteText(view);
 					}
 					return true;
 				}
@@ -48,7 +46,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 			id: 'paste-blockquote-to-current-indentation',
 			name: 'Paste blockquote to current indentation',
 			checkCallback: (checking: boolean) => {
-				let view = this.app.workspace.activeLeaf.view;
+				let view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
 					if (!checking && view instanceof MarkdownView) {
 						this.pasteText(view, this.settings.blockquotePrefix);
@@ -63,7 +61,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 			id: 'toggle-blockquote-at-current-indentation',
 			name: 'Toggle blockquote at current indentation',
 			checkCallback: (checking: boolean) => {
-				let view = this.app.workspace.activeLeaf.view;
+				let view = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (view) {
 					if (!checking && view instanceof MarkdownView) {
 						this.toggleQuote(view, this.settings.blockquotePrefix);
@@ -78,8 +76,8 @@ export default class PastetoIndentationPlugin extends Plugin {
 	async pasteText(view: MarkdownView, prefix: string = '') {
 		const clipboardText = await navigator.clipboard.readText();
 		if (clipboardText !== '') {
-			const currentCursor = view.sourceMode.editor.getCursor();
-			const currentLineText = view.sourceMode.editor.getLine(
+			const currentCursor = view.editor.getCursor();
+			const currentLineText = view.editor.getLine(
 				currentCursor.line
 			);
 			const leadingWhitespace = currentLineText.match(/^(\s*).*/)[1];
@@ -87,10 +85,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 				/\n/g, '\n' + leadingWhitespace + prefix);
 			const replacementText = prefix + 
 					clipboardTextIndented;
-			view.sourceMode.editor.replaceSelection(
-				replacementText,
-				'start'
-			);
+			view.editor.replaceSelection(replacementText);
 
 			return;
 		}
@@ -103,18 +98,18 @@ export default class PastetoIndentationPlugin extends Plugin {
 		prefix: string = this.settings.blockquotePrefix
 	) {
 		const escapedPrefix = escapeRegExp(prefix);
-		const currentSelectionStart = view.sourceMode.editor.getCursor('from');
-		const currentSelectionEnd = view.sourceMode.editor.getCursor('end');
+		const currentSelectionStart = view.editor.getCursor('from');
+		const currentSelectionEnd = view.editor.getCursor('to');
 		
 		const replacementRange = [
 			{line: currentSelectionStart.line, ch: 0},
 			{
 				line: currentSelectionEnd.line,
-				ch: view.sourceMode.editor.getLine(currentSelectionEnd.line).length
+				ch: view.editor.getLine(currentSelectionEnd.line).length
 			}
 		]
 
-		const fullSelectedLines = view.sourceMode.editor.getRange(
+		const fullSelectedLines = view.editor.getRange(
 			replacementRange[0],
 			replacementRange[1]
 		).split('\n');
@@ -163,13 +158,13 @@ export default class PastetoIndentationPlugin extends Plugin {
 			}
 		}
 
-		view.sourceMode.editor.replaceRange(
+		view.editor.replaceRange(
 			fullSelectedLines.join('\n'),
 			replacementRange[0],
 			replacementRange[1]
 		);
 
-		view.sourceMode.cmEditor.setSelection(
+		view.editor.setSelection(
 			{
 				line: currentSelectionStart.line,
 				ch: isEveryLinePrefixed ? 
@@ -181,9 +176,6 @@ export default class PastetoIndentationPlugin extends Plugin {
 				ch: isEveryLinePrefixed ? 
 					currentSelectionEnd.ch - prefix.length: 
 					currentSelectionEnd.ch + prefix.length
-			},
-			{
-				origin: '+input'
 			}
 		);
 
