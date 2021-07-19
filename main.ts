@@ -135,8 +135,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         )
         .map((e: string) => e.length)
     const minLeadingWhitespaceLength = Math.min(...filteredLeadingWhitespaces);
-    console.log(125, 'leadingWhitespaces:', leadingWhitespaces, 'filteredLeadingWhitespaces:', filteredLeadingWhitespaces, 'minLeadingWhitespaceLength:' , minLeadingWhitespaceLength);
-
+    
     // Determine whether *every* line is Prefixed or not. If not, we will
     // add the prefix to every line; if so, we will remove it from every line.
     const isEveryLinePrefixed = fullSelectedLines.every(
