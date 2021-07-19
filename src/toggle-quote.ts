@@ -42,8 +42,9 @@ export const toggleQuote = async(
       .filter((e: string, i: number) => {
         // Get rid of blank lines, which might be part of multi-line
         // passages:
-        return fullSelectedLines[i] === ''
+        return fullSelectedLines[i] !== ''
       });
+  
   // Account for if all lines actually *are* unindented, and we thus
   // filtered all lines out immediately above:
   const filteredLeadingLengths = (filteredLeadingWhitespaces.length > 0 ?
@@ -112,18 +113,26 @@ export const toggleQuote = async(
     replacementRange[1]
   );
 
+  console.log(116, currentSelectionStart.ch, currentSelectionEnd.ch, minLeadingWhitespaceLength);
+
   editor.setSelection(
     {
       line: currentSelectionStart.line,
-      ch: isEveryLinePrefixed ? 
-        currentSelectionStart.ch - prefix.length: 
-        currentSelectionStart.ch + prefix.length
+      ch: currentSelectionStart.ch < minLeadingWhitespaceLength ? 
+          currentSelectionStart.ch : (        
+          isEveryLinePrefixed
+            ? currentSelectionStart.ch - prefix.length
+            : currentSelectionStart.ch + prefix.length
+          )
     },
     {
       line: currentSelectionEnd.line,
-      ch: isEveryLinePrefixed ? 
-        currentSelectionEnd.ch - prefix.length: 
-        currentSelectionEnd.ch + prefix.length
+      ch: currentSelectionEnd.ch < minLeadingWhitespaceLength ?
+        currentSelectionEnd.ch : (
+          isEveryLinePrefixed
+            ? currentSelectionEnd.ch - prefix.length
+            : currentSelectionEnd.ch + prefix.length
+        )
     }
   );
 
