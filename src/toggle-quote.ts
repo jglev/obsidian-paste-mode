@@ -39,10 +39,10 @@ export const toggleQuote = async(
   );
   // This is in its own variable to aid in debugging:
   let filteredLeadingWhitespaces = leadingWhitespaces
-      .filter((e: string) => {
+      .filter((e: string, i: number) => {
         // Get rid of blank lines, which might be part of multi-line
         // passages:
-        return e !== ''
+        return fullSelectedLines[i] === ''
       });
   // Account for if all lines actually *are* unindented, and we thus
   // filtered all lines out immediately above:
