@@ -1,29 +1,33 @@
 // Mock several classes from Obsidian, following
 // https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts:
 
-export class Editor {
+class Notice {
+  msg: string
+
+  constructor(
+    msg: string
+  ) {
+    this.msg = msg;
+  }
+}
+
+class Editor {
   content: string[]
   selectionStart: {line: number, ch: number}
   selectionEnd: {line: number, ch: number}
   selection: {line: number, ch: number}[]
-  cursor: {line: number, ch: number}
 
   constructor(
     content: string[],
     selectionStart: {line: number, ch: number},
     selectionEnd: {line: number, ch: number},
-    cursor: {line: number, ch: number}
   ) {
     this.content = content;
-    this.selectionStart = selectionStart;
-    this.selectionEnd = selectionEnd;
-
     this.selection = [selectionStart, selectionEnd];
-    this.cursor = cursor;
   }
 
   getCursor() {
-    return this.cursor;
+    return this.selection[0];
   }
 
   getLine(line: number) {
@@ -38,7 +42,7 @@ export class Editor {
     contentInRange[0] = contentInRange[0].slice(start.ch);
     contentInRange[contentInRange.length - 1] = contentInRange[contentInRange.length - 1].slice(0, end.ch);
 
-    return contentInRange;
+    return contentInRange.join('\n');
   }
   
   setSelection(
@@ -67,7 +71,7 @@ export class Editor {
   ) {
     this.content.splice(
       start.line,
-      end.line - start.line,
+      end.line - start.line + 1,
       ...(
         this.content[start.line].slice(0, start.ch) + 
         text +
@@ -82,41 +86,19 @@ export class MarkdownView {
   selectionStart: {line: number, ch: number}
   selectionEnd: {line: number, ch: number}
   editor: Editor
-  cursor: {line: number, ch: number}
 
   constructor(
     content: string[],
     selectionStart: {line: number, ch: number},
     selectionEnd: {line: number, ch: number},
-    cursor: {line: number, ch: number}
   ) {
-    this.content = content;
-    this.selectionStart = selectionStart;
-    this.selectionEnd = selectionEnd;
-
     this.editor = new Editor(
-      this.content,
-      this.selectionStart,
-      this.selectionEnd,
-      this.cursor
+      content,
+      selectionStart,
+      selectionEnd
     );
   }
 }
 
-const view = new MarkdownView(
-  [
-    'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    'Sed venenatis lectus et leo viverra, ac viverra purus rutrum.',
-    '',
-    'Etiam semper massa ut est faucibus, eu luctus arcu porttitor.'
-  ],
-  {line: 0, ch: 0},
-  {line: 0, ch: 0},
-  {line: 0, ch: 0}
-)
+export {};
 
-// test('adds 1 + 2 to equal 3', () => {
-//   expect(sum(1, 2)).toBe(3);
-// });
-
-console.log(view);
