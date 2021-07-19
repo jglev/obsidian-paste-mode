@@ -122,9 +122,20 @@ export default class PastetoIndentationPlugin extends Plugin {
         return whitespaceMatch !== null ? whitespaceMatch[1] : '';
       }
     );
-    const minLeadingWhitespaceLength = Math.min(
-      ...leadingWhitespaces.map((e: string) => e.length)
-    );
+    // This is in its own variable to aid in debugging:
+    const filteredLeadingWhitespaces = (leadingWhitespaces
+        .filter((e: string) => {
+          // Get rid of blank lines, which might be part of multi-line
+          // passages:
+          return e !== ''
+        }) ||
+          // Account for if all lines actually *are* unindented, and we thus
+          // filtered all lines out immediately above:
+          ['']
+        )
+        .map((e: string) => e.length)
+    const minLeadingWhitespaceLength = Math.min(...filteredLeadingWhitespaces);
+    console.log(125, 'leadingWhitespaces:', leadingWhitespaces, 'filteredLeadingWhitespaces:', filteredLeadingWhitespaces, 'minLeadingWhitespaceLength:' , minLeadingWhitespaceLength);
 
     // Determine whether *every* line is Prefixed or not. If not, we will
     // add the prefix to every line; if so, we will remove it from every line.
@@ -140,23 +151,42 @@ export default class PastetoIndentationPlugin extends Plugin {
       }
     );
 
+    // Make an educated guess about using tabs vs spaces (lacking access to the
+    // "Use Tabs" setting value in Obsidian for now) by just repurposing the
+    // first actual instance of leading whitespace:
+    const exampleLeadingWhitespace = leadingWhitespaces
+    .filter(e => e.length === minLeadingWhitespaceLength);
     // Update the text in-place:
     for (const [i, text] of fullSelectedLines.entries()) {
       if (isEveryLinePrefixed === true) {
+        if (text === '') {
+          fullSelectedLines[i] = exampleLeadingWhitespace.length > 0 ? 
+            exampleLeadingWhitespace[0] : 
+            ' '.repeat(minLeadingWhitespaceLength);
+          continue
+        }
         fullSelectedLines[i] = text.replace(
           new RegExp(`^(\\s{${minLeadingWhitespaceLength}})${escapedPrefix}`),
           '$1'
           )
-      } else {
-        // If the prefix is already in the correct place, do not add to it:
-        if (!text.match(
-          new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
-        )) {
-          fullSelectedLines[i] = text.replace(
-            new RegExp(`^(\\s{${minLeadingWhitespaceLength}})`),
-            `$1${prefix}`
-          )
-        }
+          continue
+      }
+
+      if (text === '') {
+        fullSelectedLines[i] = (exampleLeadingWhitespace.length > 0 ? 
+          exampleLeadingWhitespace[0] : 
+          ' '.repeat(minLeadingWhitespaceLength)) + prefix;
+        continue
+      }
+
+      // If the prefix is already in the correct place, do not add to it:
+      if (!text.match(
+        new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
+      )) {
+        fullSelectedLines[i] = text.replace(
+          new RegExp(`^(\\s{${minLeadingWhitespaceLength}})`),
+          `$1${prefix}`
+        )
       }
     }
 
