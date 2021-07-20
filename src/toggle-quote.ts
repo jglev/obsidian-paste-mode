@@ -113,26 +113,36 @@ export const toggleQuote = async(
     replacementRange[1]
   );
 
-  console.log(116, currentSelectionStart.ch, currentSelectionEnd.ch, minLeadingWhitespaceLength);
+  let newSelectionStartCh;
+  if (currentSelectionStart.ch < minLeadingWhitespaceLength) {
+    newSelectionStartCh = currentSelectionStart.ch;
+  } else {
+    if (isEveryLinePrefixed) {
+      newSelectionStartCh = currentSelectionStart.ch - prefix.length;
+    } else {
+      newSelectionStartCh = currentSelectionStart.ch + prefix.length;
+    }
+  }
+  
+  let newSelectionEndCh;
+  if (currentSelectionEnd.ch < minLeadingWhitespaceLength) {
+    newSelectionEndCh = currentSelectionEnd.ch;
+  } else {
+    if (isEveryLinePrefixed) {
+      newSelectionEndCh = currentSelectionEnd.ch - prefix.length;
+    } else {
+      newSelectionEndCh = currentSelectionEnd.ch + prefix.length;
+    }
+  }
 
   editor.setSelection(
     {
       line: currentSelectionStart.line,
-      ch: currentSelectionStart.ch < minLeadingWhitespaceLength ? 
-          currentSelectionStart.ch : (        
-          isEveryLinePrefixed
-            ? currentSelectionStart.ch - prefix.length
-            : currentSelectionStart.ch + prefix.length
-          )
+      ch: newSelectionStartCh
     },
     {
       line: currentSelectionEnd.line,
-      ch: currentSelectionEnd.ch < minLeadingWhitespaceLength ?
-        currentSelectionEnd.ch : (
-          isEveryLinePrefixed
-            ? currentSelectionEnd.ch - prefix.length
-            : currentSelectionEnd.ch + prefix.length
-        )
+      ch: newSelectionEndCh
     }
   );
 
