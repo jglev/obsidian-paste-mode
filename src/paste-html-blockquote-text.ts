@@ -15,7 +15,6 @@ export const pasteHTMLBlockquoteText = async (view: MarkdownView) => {
       /(\n\s*)*$/,
       ''
     );
-    console.log(18, clipboardTextIndented);
     const replacementText =
       `<blockquote>\n${leadingWhitespace}${padding}` +
       clipboardTextIndented +
