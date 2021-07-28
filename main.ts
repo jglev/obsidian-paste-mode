@@ -4,6 +4,7 @@ import {
 
 import { toggleQuote } from './src/toggle-quote';
 import { pasteText } from './src/paste-text';
+import { pasteHTMLBlockquoteText } from "./src/paste-html-blockquote-text";
 
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
@@ -49,6 +50,21 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
         return false;
       }
+    });
+
+    this.addCommand({
+      id: "paste-html-wrapped-blockquote",
+      name: "Paste HTML-wrapped blockquote to current indentation",
+      checkCallback: (checking: boolean) => {
+        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+          if (!checking && view instanceof MarkdownView) {
+            pasteHTMLBlockquoteText(view);
+          }
+          return true;
+        }
+        return false;
+      },
     });
 
     this.addCommand({
