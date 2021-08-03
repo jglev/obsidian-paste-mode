@@ -10,6 +10,7 @@
     "test-dev": "jest --passWithNoTests --watch --verbose --silent=false '__tests__/toggle-quote.ts'"
   },
   "keywords": [],
+  "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",
   "author": "Jacob Levernier",
   "license": "BSD-3-Clause",
   "devDependencies": {
