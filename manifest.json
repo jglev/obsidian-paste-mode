@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-paste-to-current-indentation",
-	"name": "Paste to Current Indentation",
-	"version": "1.0.0",
-	"minAppVersion": "0.12.10",
-	"description": "This plugin allows pasting and marking text as block-quotes at any level of indentation.",
-	"author": "Jacob Levernier",
-	"authorUrl": "https://https://github.com/publicus/obsidian-paste-to-current-indentation",
-	"isDesktopOnly": false
+  "id": "obsidian-paste-to-current-indentation",
+  "name": "Paste to Current Indentation",
+  "version": "1.1.0",
+  "minAppVersion": "0.12.10",
+  "description": "This plugin allows pasting and marking text as block-quotes at any level of indentation.",
+  "author": "Jacob Levernier",
+  "authorUrl": "https://https://github.com/publicus/obsidian-paste-to-current-indentation",
+  "isDesktopOnly": false
 }
