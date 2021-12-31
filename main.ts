@@ -48,22 +48,43 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         // editor.setLine(currentLine, `TESTER${editor.getLine(currentLine)}`);
 
-        console.log(35, evt, editor, markdownView);
-        console.log(52, evt.clipboardData.getData("text"));
-        console.log(53, evt.clipboardData.getData("text/html"));
+        // console.log(35, evt, editor, markdownView);
+        // console.log(52, evt.clipboardData.getData("text"));
+        // console.log(53, evt.clipboardData.getData("text/html"));
 
         const items = evt.clipboardData.items;
 
+        const output = [];
+
         for (var i = 0; i < items.length; i++) {
-          // Skip content if not image
-          if (items[i].type.indexOf("image") == -1) continue;
-          // Retrieve image on clipboard as blob
-          var blob = items[i].getAsFile();
+          if (items[i] === undefined) {
+            continue;
+          }
+
+          console.log(59, items[i].kind, items[i]);
+          const item = items[i];
+          if (item.kind == "string") {
+            item.getAsString((data) => {
+              if (item.type === "text/html") {
+                output.push(htmlToMarkdown(data));
+                return;
+              }
+              // item.type is "text"
+              output.push(data);
+            });
+          }
+          if (item.kind == "file") {
+            const blob = item.getAsFile();
+            console.log(71, blob);
+            output.push(blob.name);
+          }
         }
 
-        this.app.workspace.trigger("paste");
+        console.log(83, output);
 
-        console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
+        // this.app.workspace.trigger("paste");
+
+        // console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
 
         return "TEST1";
       }
