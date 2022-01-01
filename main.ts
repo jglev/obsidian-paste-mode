@@ -12,7 +12,7 @@ import {
   Workspace,
 } from "obsidian";
 
-import { toggleQuote } from "./src/toggle-quote";
+import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 import { pasteText } from "./src/paste-text";
 import { pasteHTMLBlockquoteText } from "./src/paste-html-blockquote-text";
 
@@ -91,65 +91,83 @@ export default class PastetoIndentationPlugin extends Plugin {
           return;
         }
 
+        const mode = this.settings.mode;
+
+        if (mode === Mode.Passthrough) {
+          return;
+        }
+
         evt.preventDefault();
 
-        const currentLine = editor.getCursor().line;
+        let output = "";
 
-        editor.setLine(currentLine, `TESTER${editor.getLine(currentLine)}`);
-
-        console.log(35, evt, editor, markdownView);
-        console.log(52, evt.clipboardData.getData("text"));
-        console.log(53, evt.clipboardData.getData("text/html"));
-
-        const items = evt.clipboardData.items;
-
-        let output: string[] = [];
-
-        for (var i = 0; i < items.length; i++) {
-          if (items[i] === undefined) {
-            continue;
+        if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+          output = htmlToMarkdown(evt.clipboardData.getData("text/html"));
+          if (output === "") {
+            output = evt.clipboardData.getData("text");
           }
-
-          console.log(59, items[i].kind, items[i]);
-          const item = items[i];
-          if (item.kind == "string") {
-            item.getAsString((data) => {
-              if (item.type === "text/html") {
-                output.push(htmlToMarkdown(data));
-                return;
-              }
-              // item.type is "text"
-              output.push(data);
-            });
-          }
-          if (item.kind == "file") {
-            const blob = item.getAsFile();
-            console.log(71, blob);
-            // output.push(blob.name);
-            const currentDateTime = new Date()
-              .toISOString()
-              .replaceAll(/[:-]/g, "")
-              .slice(0, 15);
-            const blobFileName = `${currentDateTime}${
-              blob.name != undefined && blob.name !== "" ? "-" : ""
-            }${blob.name}`;
-            const file = new File([blob], blob.name, {
-              type: blob.type,
-              lastModified: blob.lastModified,
-            });
-            console.log(99, file);
-            // const blobLink = this.app.fileManager.generateMarkdownLink(
-            //   new TFile(),
-            //   blobFileName
-            // );
-            // output.push(blobLink);
+          if (mode === Mode.MarkdownBlockquote) {
+            // TODO: Fill this in.
           }
         }
 
-        console.log(83, output);
-        this.app.workspace.trigger("paste");
+        if (mode === Mode.Text || mode === Mode.TextBlockquote) {
+          output = htmlToMarkdown(evt.clipboardData.getData("text"));
+        }
 
-        console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
+        editor.setValue(output);
+
+        // console.log(35, evt, editor, markdownView);
+        // console.log(52, evt.clipboardData.getData("text"));
+        // console.log(53, evt.clipboardData.getData("text/html"));
+
+        // const items = evt.clipboardData.items;
+
+        // for (var i = 0; i < items.length; i++) {
+        //   if (items[i] === undefined) {
+        //     continue;
+        //   }
+
+        //   console.log(59, items[i].kind, items[i]);
+        //   const item = items[i];
+        //   if (item.kind == "string") {
+        //     item.getAsString((data) => {
+        //       if (item.type === "text/html") {
+        //         output.push(htmlToMarkdown(data));
+        //         return;
+        //       }
+        //       // item.type is "text"
+        //       output.push(data);
+        //     });
+        //   }
+        //   if (item.kind == "file") {
+        //     const blob = item.getAsFile();
+        //     console.log(71, blob);
+        //     // output.push(blob.name);
+        //     const currentDateTime = new Date()
+        //       .toISOString()
+        //       .replaceAll(/[:-]/g, "")
+        //       .slice(0, 15);
+        //     const blobFileName = `${currentDateTime}${
+        //       blob.name != undefined && blob.name !== "" ? "-" : ""
+        //     }${blob.name}`;
+        //     const file = new File([blob], blob.name, {
+        //       type: blob.type,
+        //       lastModified: blob.lastModified,
+        //     });
+        //     console.log(99, file);
+        //     // const blobLink = this.app.fileManager.generateMarkdownLink(
+        //     //   new TFile(),
+        //     //   blobFileName
+        //     // );
+        //     // output.push(blobLink);
+        //   }
+        // }
+
+        // console.log(83, output);
+        // this.app.workspace.trigger("paste");
+
+        // console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
       }
     );
 
@@ -217,7 +235,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         let view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
           if (!checking && view instanceof MarkdownView) {
-            toggleQuote(view, this.settings.blockquotePrefix);
+            toggleQuoteInEditor(view, this.settings.blockquotePrefix);
           }
           return true;
         }
