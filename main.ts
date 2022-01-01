@@ -7,12 +7,15 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  TFile,
   Workspace,
 } from "obsidian";
 
 import { toggleQuote } from "./src/toggle-quote";
 import { pasteText } from "./src/paste-text";
 import { pasteHTMLBlockquoteText } from "./src/paste-html-blockquote-text";
+
+import path from "path";
 
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
@@ -46,7 +49,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         const currentLine = editor.getCursor().line;
 
-        // editor.setLine(currentLine, `TESTER${editor.getLine(currentLine)}`);
+        editor.setLine(currentLine, `TESTER${editor.getLine(currentLine)}`);
 
         // console.log(35, evt, editor, markdownView);
         // console.log(52, evt.clipboardData.getData("text"));
@@ -54,7 +57,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         const items = evt.clipboardData.items;
 
-        const output = [];
+        let output: string[] = [];
 
         for (var i = 0; i < items.length; i++) {
           if (items[i] === undefined) {
@@ -76,7 +79,24 @@ export default class PastetoIndentationPlugin extends Plugin {
           if (item.kind == "file") {
             const blob = item.getAsFile();
             console.log(71, blob);
-            output.push(blob.name);
+            // output.push(blob.name);
+            const currentDateTime = new Date()
+              .toISOString()
+              .replaceAll(/[:-]/g, "")
+              .slice(0, 15);
+            const blobFileName = `${currentDateTime}${
+              blob.name != undefined && blob.name !== "" ? "-" : ""
+            }${blob.name}`;
+            const file = new File([blob], blob.name, {
+              type: blob.type,
+              lastModified: blob.lastModified,
+            });
+            console.log(99, file);
+            // const blobLink = this.app.fileManager.generateMarkdownLink(
+            //   new TFile(),
+            //   blobFileName
+            // );
+            // output.push(blobLink);
           }
         }
 
@@ -85,8 +105,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         // this.app.workspace.trigger("paste");
 
         // console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
-
-        return "TEST1";
       }
     );
 
