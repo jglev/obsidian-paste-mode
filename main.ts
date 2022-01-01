@@ -55,52 +55,52 @@ export default class PastetoIndentationPlugin extends Plugin {
         // console.log(52, evt.clipboardData.getData("text"));
         // console.log(53, evt.clipboardData.getData("text/html"));
 
-        const items = evt.clipboardData.items;
+        // const items = evt.clipboardData.items;
 
-        let output: string[] = [];
+        // let output: string[] = [];
 
-        for (var i = 0; i < items.length; i++) {
-          if (items[i] === undefined) {
-            continue;
-          }
+        // for (var i = 0; i < items.length; i++) {
+        //   if (items[i] === undefined) {
+        //     continue;
+        //   }
 
-          console.log(59, items[i].kind, items[i]);
-          const item = items[i];
-          if (item.kind == "string") {
-            item.getAsString((data) => {
-              if (item.type === "text/html") {
-                output.push(htmlToMarkdown(data));
-                return;
-              }
-              // item.type is "text"
-              output.push(data);
-            });
-          }
-          if (item.kind == "file") {
-            const blob = item.getAsFile();
-            console.log(71, blob);
-            // output.push(blob.name);
-            const currentDateTime = new Date()
-              .toISOString()
-              .replaceAll(/[:-]/g, "")
-              .slice(0, 15);
-            const blobFileName = `${currentDateTime}${
-              blob.name != undefined && blob.name !== "" ? "-" : ""
-            }${blob.name}`;
-            const file = new File([blob], blob.name, {
-              type: blob.type,
-              lastModified: blob.lastModified,
-            });
-            console.log(99, file);
-            // const blobLink = this.app.fileManager.generateMarkdownLink(
-            //   new TFile(),
-            //   blobFileName
-            // );
-            // output.push(blobLink);
-          }
-        }
+        //   console.log(59, items[i].kind, items[i]);
+        //   const item = items[i];
+        //   if (item.kind == "string") {
+        //     item.getAsString((data) => {
+        //       if (item.type === "text/html") {
+        //         output.push(htmlToMarkdown(data));
+        //         return;
+        //       }
+        //       // item.type is "text"
+        //       output.push(data);
+        //     });
+        //   }
+        //   if (item.kind == "file") {
+        //     const blob = item.getAsFile();
+        //     console.log(71, blob);
+        //     // output.push(blob.name);
+        //     const currentDateTime = new Date()
+        //       .toISOString()
+        //       .replaceAll(/[:-]/g, "")
+        //       .slice(0, 15);
+        //     const blobFileName = `${currentDateTime}${
+        //       blob.name != undefined && blob.name !== "" ? "-" : ""
+        //     }${blob.name}`;
+        //     const file = new File([blob], blob.name, {
+        //       type: blob.type,
+        //       lastModified: blob.lastModified,
+        //     });
+        //     console.log(99, file);
+        //     // const blobLink = this.app.fileManager.generateMarkdownLink(
+        //     //   new TFile(),
+        //     //   blobFileName
+        //     // );
+        //     // output.push(blobLink);
+        //   }
+        // }
 
-        console.log(83, output);
+        // console.log(83, output);
 
         // this.app.workspace.trigger("paste");
 
