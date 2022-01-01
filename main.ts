@@ -15,18 +15,27 @@ import { toggleQuote } from "./src/toggle-quote";
 import { pasteText } from "./src/paste-text";
 import { pasteHTMLBlockquoteText } from "./src/paste-html-blockquote-text";
 
-import path from "path";
+enum Mode {
+  Text = "text",
+  TextBlockquote = "text-blockquote",
+  Markdown = "markdown",
+  MarkdownBlockquote = "markdown-blockquote",
+  Passthrough = "passthrough",
+}
 
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
+  mode: Mode;
 }
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
+  mode: Mode.Markdown,
 };
 
 export default class PastetoIndentationPlugin extends Plugin {
   settings: PastetoIndentationPluginSettings;
+  statusBar: HTMLElement;
 
   async onload() {
     await this.loadSettings();
@@ -41,70 +50,73 @@ export default class PastetoIndentationPlugin extends Plugin {
         // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
         // "Check for `evt.defaultPrevented` before attempting to handle this
         // event, and return if it has been already handled."
+        console.log(46, evt.clipboardData.types);
         if (evt.defaultPrevented) {
           return;
         }
-        // console.log(43);
+        if (evt.clipboardData.types.every((type) => type === "files")) {
+          return;
+        }
+
         evt.preventDefault();
 
         const currentLine = editor.getCursor().line;
 
         editor.setLine(currentLine, `TESTER${editor.getLine(currentLine)}`);
 
-        // console.log(35, evt, editor, markdownView);
-        // console.log(52, evt.clipboardData.getData("text"));
-        // console.log(53, evt.clipboardData.getData("text/html"));
+        console.log(35, evt, editor, markdownView);
+        console.log(52, evt.clipboardData.getData("text"));
+        console.log(53, evt.clipboardData.getData("text/html"));
 
-        // const items = evt.clipboardData.items;
+        const items = evt.clipboardData.items;
 
-        // let output: string[] = [];
+        let output: string[] = [];
 
-        // for (var i = 0; i < items.length; i++) {
-        //   if (items[i] === undefined) {
-        //     continue;
-        //   }
+        for (var i = 0; i < items.length; i++) {
+          if (items[i] === undefined) {
+            continue;
+          }
 
-        //   console.log(59, items[i].kind, items[i]);
-        //   const item = items[i];
-        //   if (item.kind == "string") {
-        //     item.getAsString((data) => {
-        //       if (item.type === "text/html") {
-        //         output.push(htmlToMarkdown(data));
-        //         return;
-        //       }
-        //       // item.type is "text"
-        //       output.push(data);
-        //     });
-        //   }
-        //   if (item.kind == "file") {
-        //     const blob = item.getAsFile();
-        //     console.log(71, blob);
-        //     // output.push(blob.name);
-        //     const currentDateTime = new Date()
-        //       .toISOString()
-        //       .replaceAll(/[:-]/g, "")
-        //       .slice(0, 15);
-        //     const blobFileName = `${currentDateTime}${
-        //       blob.name != undefined && blob.name !== "" ? "-" : ""
-        //     }${blob.name}`;
-        //     const file = new File([blob], blob.name, {
-        //       type: blob.type,
-        //       lastModified: blob.lastModified,
-        //     });
-        //     console.log(99, file);
-        //     // const blobLink = this.app.fileManager.generateMarkdownLink(
-        //     //   new TFile(),
-        //     //   blobFileName
-        //     // );
-        //     // output.push(blobLink);
-        //   }
-        // }
+          console.log(59, items[i].kind, items[i]);
+          const item = items[i];
+          if (item.kind == "string") {
+            item.getAsString((data) => {
+              if (item.type === "text/html") {
+                output.push(htmlToMarkdown(data));
+                return;
+              }
+              // item.type is "text"
+              output.push(data);
+            });
+          }
+          if (item.kind == "file") {
+            const blob = item.getAsFile();
+            console.log(71, blob);
+            // output.push(blob.name);
+            const currentDateTime = new Date()
+              .toISOString()
+              .replaceAll(/[:-]/g, "")
+              .slice(0, 15);
+            const blobFileName = `${currentDateTime}${
+              blob.name != undefined && blob.name !== "" ? "-" : ""
+            }${blob.name}`;
+            const file = new File([blob], blob.name, {
+              type: blob.type,
+              lastModified: blob.lastModified,
+            });
+            console.log(99, file);
+            // const blobLink = this.app.fileManager.generateMarkdownLink(
+            //   new TFile(),
+            //   blobFileName
+            // );
+            // output.push(blobLink);
+          }
+        }
 
-        // console.log(83, output);
+        console.log(83, output);
+        this.app.workspace.trigger("paste");
 
-        // this.app.workspace.trigger("paste");
-
-        // console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
+        console.log(57, htmlToMarkdown(evt.clipboardData.getData("text/html")));
       }
     );
 
@@ -167,6 +179,19 @@ export default class PastetoIndentationPlugin extends Plugin {
         return false;
       },
     });
+
+    this.statusBar = this.addStatusBarItem();
+    this.statusBar.setText(`Paste Mode: ${this.settings.mode}`);
+
+    //   const ribbonIconEl = this.addRibbonIcon(
+    //     this.settings.mode === Mode.Text ? "document" : "code-glyph",
+    //     "Paste Mode",
+    //     (evt: MouseEvent) => {
+    //       // Called when the user clicks the icon.
+    //       new Notice("This is a notice!");
+    //     }
+    //   );
+    //   ribbonIconEl.addClass("paste-mode-ribbon");
   }
 
   async loadSettings() {
@@ -187,29 +212,50 @@ class SettingTab extends PluginSettingTab {
   }
 
   display(): void {
-    let {containerEl} = this;
+    let { containerEl } = this;
 
     containerEl.empty();
 
-    containerEl.createEl('h2', {text: 'Paste to Current Indentation'});
+    containerEl.createEl("h2", { text: "Paste to Current Indentation" });
 
     new Setting(containerEl)
-      .setName('Blockquote Prefix')
+      .setName("Paste Mode")
+      .setDesc("Mode that the paste command will invoke.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption(Mode.Text, "Plain Text")
+          .addOption(Mode.TextBlockquote, "Plain Text (Blockquote)")
+          .addOption(Mode.Markdown, "Markdown")
+          .addOption(Mode.MarkdownBlockquote, "Markdown (Blockquote)")
+          .addOption(Mode.Passthrough, "Passthrough")
+          .setValue(this.plugin.settings.mode || DEFAULT_SETTINGS.mode)
+          .onChange(async (value) => {
+            this.plugin.settings.mode =
+              (value as Mode) || DEFAULT_SETTINGS.mode;
+            await this.plugin.saveSettings();
+            this.plugin.statusBar.setText(`Paste Mode: ${this.plugin.settings.mode}`);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Blockquote Prefix")
       .setDesc(
-        'Markdown syntax to signify that a line is part of a blockquote.'
+        "Markdown syntax to signify that a line is part of a blockquote."
       )
-      .addText(text => text
-        .setPlaceholder('>•')
-        .setValue(
-          this.plugin.settings.blockquotePrefix === DEFAULT_SETTINGS.blockquotePrefix ?
-            '' :
-            this.plugin.settings.blockquotePrefix
-        )
-        .onChange(async (value) => {
-          this.plugin.settings.blockquotePrefix = value !== '' 
-            ? value :
-            DEFAULT_SETTINGS.blockquotePrefix;
-          await this.plugin.saveSettings();
-        }));
+      .addText((text) =>
+        text
+          .setPlaceholder(">•")
+          .setValue(
+            this.plugin.settings.blockquotePrefix ===
+              DEFAULT_SETTINGS.blockquotePrefix
+              ? ""
+              : this.plugin.settings.blockquotePrefix
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.blockquotePrefix =
+              value !== "" ? value : DEFAULT_SETTINGS.blockquotePrefix;
+            await this.plugin.saveSettings();
+          })
+      );
   }
 }
