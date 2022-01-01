@@ -1,6 +1,7 @@
 import {
   App,
   Editor,
+  FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
   Notice,
@@ -21,6 +22,38 @@ enum Mode {
   Markdown = "markdown",
   MarkdownBlockquote = "markdown-blockquote",
   Passthrough = "passthrough",
+}
+
+class PasteModeModal extends FuzzySuggestModal<number> {
+  public readonly onChooseItem: (item: number) => void;
+
+  constructor({
+    app,
+    onChooseItem,
+  }: {
+    app: App;
+    onChooseItem: (patternIndex: number) => void;
+  }) {
+    super(app);
+
+    this.onChooseItem = (patternIndex: number) => {
+      onChooseItem(patternIndex);
+      // Note: Using this.close() here was causing a bug whereby new
+      // text was unable to be typed until the user had opened another
+      // modal or switched away from the window. @lishid noted at
+      // https://github.com/obsidianmd/obsidian-releases/pull/396#issuecomment-894017526
+      // that the modal is automatically closed at the conclusion of
+      // onChooseItem.
+    };
+  }
+
+  getItems(): number[] {
+    return Object.keys(Mode).map((key, index) => index);
+  }
+
+  getItemText(index: number): string {
+    return Object.values(Mode)[index];
+  }
 }
 
 interface PastetoIndentationPluginSettings {
@@ -120,6 +153,18 @@ export default class PastetoIndentationPlugin extends Plugin {
       }
     );
 
+    Object.values(Mode).forEach((value) => {
+      this.addCommand({
+        id: `past-mode-${value}`,
+        name: `Set Paste Mode to ${value}`,
+        callback: async () => {
+          this.settings.mode = value;
+          await this.saveSettings();
+          this.statusBar.setText(`Paste Mode: ${value}`);
+        },
+      });
+    });
+
     this.addCommand({
       id: "paste-text-to-current-indentation",
       name: "Paste text to current indentation",
@@ -182,16 +227,17 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.statusBar = this.addStatusBarItem();
     this.statusBar.setText(`Paste Mode: ${this.settings.mode}`);
-
-    //   const ribbonIconEl = this.addRibbonIcon(
-    //     this.settings.mode === Mode.Text ? "document" : "code-glyph",
-    //     "Paste Mode",
-    //     (evt: MouseEvent) => {
-    //       // Called when the user clicks the icon.
-    //       new Notice("This is a notice!");
-    //     }
-    //   );
-    //   ribbonIconEl.addClass("paste-mode-ribbon");
+    const onChooseItem = async (item: number): Promise<void> => {
+      const selection = Object.values(Mode)[item];
+      this.settings.mode = selection;
+      await this.saveSettings();
+      this.statusBar.setText(`Paste Mode: ${selection}`);
+    };
+    const app = this.app;
+    this.statusBar.onClickEvent(() => {
+      const newMode = new PasteModeModal({ app, onChooseItem });
+      newMode.open();
+    });
   }
 
   async loadSettings() {
