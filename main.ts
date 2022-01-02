@@ -14,8 +14,6 @@ import {
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
-import { pasteText } from "./src/paste-text";
-
 enum Mode {
   Text = "text",
   TextBlockquote = "text-blockquote",
@@ -155,7 +153,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           );
           output = toggledText.lines.join("\n");
         }
-        
+
         const cursorFrom = { line: editor.getCursor().line, ch: 0 };
         const cursorTo = editor.getCursor("to");
 
@@ -177,8 +175,6 @@ export default class PastetoIndentationPlugin extends Plugin {
           };
         }
 
-        console.log(148, transactionChange);
-
         const transaction: EditorTransaction = {
           changes: [transactionChange],
         };
@@ -192,6 +188,39 @@ export default class PastetoIndentationPlugin extends Plugin {
         id: `paste-mode-${value}`,
         name: `Set Paste Mode to ${value}`,
         callback: () => changePasteMode(value),
+      });
+    });
+
+    Object.values(Mode).forEach((value) => {
+      this.addCommand({
+        id: `cycle-paste-mode`,
+        name: `Cycle Paste Mode`,
+        callback: async () => {
+          const nextMode = (): Mode => {
+            const currentMode = this.settings.mode;
+            const modeValues = Object.values(Mode);
+            let newMode;
+            modeValues.forEach((value, index) => {
+              if (value === currentMode) {
+                console.log(206, currentMode, value, index);
+                if (index === modeValues.length - 1) {
+                  console.log(208, modeValues, modeValues[0]);
+                  newMode = modeValues[0];
+                  return newMode;
+                }
+                console.log(208, modeValues, modeValues[index + 1]);
+                newMode = modeValues[index + 1];
+                return newMode;
+              }
+            });
+            return newMode;
+          };
+
+          const newPasteMode = nextMode();
+
+          await changePasteMode(newPasteMode);
+          new Notice(`Paste mode changed to ${newPasteMode}`);
+        },
       });
     });
 
