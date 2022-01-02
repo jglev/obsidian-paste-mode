@@ -10,14 +10,16 @@ function escapeRegExp(string: string) {
 }
 
 export const toggleQuote = async (
-  fullLines: string[],
+  linesInput: string[],
   prefix: string
 ): Promise<{
   lines: string[];
   minLeadingWhitespaceLength: number;
   isEveryLinePrefixed: boolean;
 }> => {
+  const fullLines = [...linesInput];
   const escapedPrefix = escapeRegExp(prefix);
+  console.log(21, fullLines);
 
   const leadingWhitespaces = fullLines.map((e: string) => {
     const whitespaceMatch = e.match(new RegExp(`^(\\s*)`));
@@ -32,7 +34,7 @@ export const toggleQuote = async (
     }
   );
 
-  console.log(35, fullLines);
+  console.log(35, fullLines, leadingWhitespaces, filteredLeadingWhitespaces);
 
   // Account for if all lines actually *are* unindented, and we thus
   // filtered all lines out immediately above:
@@ -40,6 +42,8 @@ export const toggleQuote = async (
     filteredLeadingWhitespaces.length > 0 ? filteredLeadingWhitespaces : [""]
   ).map((e: string) => e.length);
   const minLeadingWhitespaceLength = Math.min(...filteredLeadingLengths);
+
+  console.log(87, minLeadingWhitespaceLength);
 
   // Determine whether *every* line is Prefixed or not. If not, we will
   // add the prefix to every line; if so, we will remove it from every line.

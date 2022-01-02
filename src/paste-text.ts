@@ -1,25 +1,12 @@
-import { MarkdownView, Notice } from 'obsidian';
+export const pasteText = (fullLines: string[], prefix: string = "") => {
+  console.log(2, fullLines);
+  const leadingWhitespace = fullLines[0].match(/^(\s*).*/)[1];
+  const clipboardTextIndented = fullLines
+    .join("\n")
+    .replaceAll(/\n/g, "\n" + leadingWhitespace + prefix);
+  const replacementText = prefix + clipboardTextIndented;
 
-export const pasteText = async (
-  view: MarkdownView,
-  prefix: string = ''
-) => {
-  const editor = view.editor;
-  const clipboardText = await navigator.clipboard.readText();
-  if (clipboardText !== '') {
-    const currentCursor = editor.getCursor();
-    const currentLineText = editor.getLine(
-      currentCursor.line
-    );
-    const leadingWhitespace = currentLineText.match(/^(\s*).*/)[1];
-    const clipboardTextIndented = clipboardText.replaceAll(
-      /\n/g, '\n' + leadingWhitespace + prefix);
-    const replacementText = prefix + 
-        clipboardTextIndented;
-    editor.replaceSelection(replacementText);
+  console.log(8, replacementText);
 
-    return;
-  }
-
-  new Notice('The clipboard is currently empty.');
-}
+  return replacementText;
+};

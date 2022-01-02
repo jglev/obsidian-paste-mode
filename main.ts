@@ -14,6 +14,8 @@ import {
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
+import { pasteText } from "./src/paste-text";
+
 enum Mode {
   Text = "text",
   TextBlockquote = "text-blockquote",
@@ -92,7 +94,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           return;
         }
 
-        const mode = this.settings.mode;
+        let mode = this.settings.mode;
 
         if (mode === Mode.Passthrough) {
           return;
@@ -103,13 +105,32 @@ export default class PastetoIndentationPlugin extends Plugin {
         let output = "";
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          output = htmlToMarkdown(evt.clipboardData.getData("text/html"));
-          if (output === "") {
-            output = evt.clipboardData.getData("text");
+          const clipboardContents = htmlToMarkdown(
+            evt.clipboardData.getData("text/html")
+          );
+
+          const input = (
+            editor
+              .getLine(editor.getCursor("from").line)
+              .slice(0, editor.getCursor("from").ch) + clipboardContents
+          ).split("\n");
+
+          console.log(116, input);
+
+          if (clipboardContents === "") {
+            if (mode === Mode.Markdown) {
+              mode = Mode.Text;
+            } else {
+              mode = Mode.TextBlockquote;
+            }
+          }
+          console.log(125, mode);
+          if (mode === Mode.Markdown) {
+            output = pasteText(input);
           }
           if (mode === Mode.MarkdownBlockquote) {
             const toggledText = await toggleQuote(
-              output.split("\n"),
+              input,
               this.settings.blockquotePrefix
             );
             output = toggledText.lines.join("\n");
@@ -117,18 +138,42 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Text || mode === Mode.TextBlockquote) {
-          output = evt.clipboardData.getData("text");
+          const clipboardContents = evt.clipboardData.getData("text");
+
+          console.log(146, clipboardContents);
+
+          const leadingWhitespaceMatch = editor
+            .getLine(editor.getCursor().line)
+            .match(new RegExp(`^(\\s*)`));
+          const leadingWhitespace =
+            leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
+
+          const input = clipboardContents.split("\n").map((line, i) => {
+            if (i === 0) {
+              return (
+                editor
+                  .getLine(editor.getCursor("from").line)
+                  .slice(0, editor.getCursor("from").ch) + line
+              );
+            }
+
+            return leadingWhitespace + line;
+          });
+
+          if (mode === Mode.Text) {
+            output = input.join("\n");
+          }
 
           if (mode === Mode.TextBlockquote) {
             const toggledText = await toggleQuote(
-              output.split("\n"),
+              input,
               this.settings.blockquotePrefix
             );
             output = toggledText.lines.join("\n");
           }
         }
 
-        const cursorFrom = editor.getCursor("from");
+        const cursorFrom = { line: editor.getCursor().line, ch: 0 };
         const cursorTo = editor.getCursor("to");
 
         let transactionChange: EditorChange = {
@@ -137,10 +182,16 @@ export default class PastetoIndentationPlugin extends Plugin {
         };
 
         if (
-          cursorFrom.line === cursorTo.line &&
-          cursorFrom.ch === cursorTo.ch
+          cursorFrom.line !== cursorTo.line ||
+          cursorFrom.ch !== cursorTo.ch
         ) {
-          transactionChange = { ...transactionChange, to: cursorTo };
+          transactionChange = {
+            ...transactionChange,
+            to: {
+              line: cursorTo.line,
+              ch: editor.getLine(cursorTo.line).length,
+            },
+          };
         }
 
         console.log(148, transactionChange);
