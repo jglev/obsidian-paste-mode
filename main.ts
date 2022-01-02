@@ -2,7 +2,6 @@ import {
   App,
   Editor,
   EditorChange,
-  EditorRangeOrCaret,
   EditorTransaction,
   FuzzySuggestModal,
   htmlToMarkdown,
@@ -11,13 +10,9 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  TFile,
-  Workspace,
 } from "obsidian";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
-import { pasteText } from "./src/paste-text";
-import { pasteHTMLBlockquoteText } from "./src/paste-html-blockquote-text";
 
 enum Mode {
   Text = "text",
@@ -76,15 +71,17 @@ export default class PastetoIndentationPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    const changePasteMode = async (value: Mode) => {
+      this.settings.mode = value;
+      await this.saveSettings();
+      this.statusBar.setText(`Paste Mode: ${value}`);
+    };
+
     this.addSettingTab(new SettingTab(this.app, this));
 
     this.app.workspace.on(
       "editor-paste",
-      async (
-        evt: ClipboardEvent,
-        editor: Editor,
-        markdownView: MarkdownView
-      ) => {
+      async (evt: ClipboardEvent, editor: Editor) => {
         // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
         // "Check for `evt.defaultPrevented` before attempting to handle this
         // event, and return if it has been already handled."
@@ -120,7 +117,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Text || mode === Mode.TextBlockquote) {
-          output = htmlToMarkdown(evt.clipboardData.getData("text"));
+          output = evt.clipboardData.getData("text");
 
           if (mode === Mode.TextBlockquote) {
             const toggledText = await toggleQuote(
@@ -130,8 +127,6 @@ export default class PastetoIndentationPlugin extends Plugin {
             output = toggledText.lines.join("\n");
           }
         }
-
-        console.log(132, editor.getCursor());
 
         const cursorFrom = editor.getCursor("from");
         const cursorTo = editor.getCursor("to");
@@ -148,73 +143,22 @@ export default class PastetoIndentationPlugin extends Plugin {
           transactionChange = { ...transactionChange, to: cursorTo };
         }
 
+        console.log(148, transactionChange);
+
         const transaction: EditorTransaction = {
           changes: [transactionChange],
         };
 
         editor.transaction(transaction);
-
-        // console.log(35, evt, editor, markdownView);
-        // console.log(52, evt.clipboardData.getData("text"));
-        // console.log(53, evt.clipboardData.getData("text/html"));
       }
     );
 
     Object.values(Mode).forEach((value) => {
       this.addCommand({
-        id: `past-mode-${value}`,
+        id: `paste-mode-${value}`,
         name: `Set Paste Mode to ${value}`,
-        callback: async () => {
-          this.settings.mode = value;
-          await this.saveSettings();
-          this.statusBar.setText(`Paste Mode: ${value}`);
-        },
+        callback: () => changePasteMode(value),
       });
-    });
-
-    this.addCommand({
-      id: "paste-text-to-current-indentation",
-      name: "Paste text to current indentation",
-      checkCallback: (checking: boolean) => {
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          if (!checking) {
-            pasteText(view);
-          }
-          return true;
-        }
-        return false;
-      },
-    });
-
-    this.addCommand({
-      id: "paste-blockquote-to-current-indentation",
-      name: "Paste blockquote to current indentation",
-      checkCallback: (checking: boolean) => {
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          if (!checking && view instanceof MarkdownView) {
-            pasteText(view, this.settings.blockquotePrefix);
-          }
-          return true;
-        }
-        return false;
-      },
-    });
-
-    this.addCommand({
-      id: "paste-html-wrapped-blockquote",
-      name: "Paste HTML-wrapped blockquote to current indentation",
-      checkCallback: (checking: boolean) => {
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          if (!checking && view instanceof MarkdownView) {
-            pasteHTMLBlockquoteText(view);
-          }
-          return true;
-        }
-        return false;
-      },
     });
 
     this.addCommand({
@@ -236,9 +180,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.statusBar.setText(`Paste Mode: ${this.settings.mode}`);
     const onChooseItem = async (item: number): Promise<void> => {
       const selection = Object.values(Mode)[item];
-      this.settings.mode = selection;
-      await this.saveSettings();
-      this.statusBar.setText(`Paste Mode: ${selection}`);
+      await changePasteMode(selection);
     };
     const app = this.app;
     this.statusBar.onClickEvent(() => {

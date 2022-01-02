@@ -32,6 +32,8 @@ export const toggleQuote = async (
     }
   );
 
+  console.log(35, fullLines);
+
   // Account for if all lines actually *are* unindented, and we thus
   // filtered all lines out immediately above:
   const filteredLeadingLengths = (
@@ -94,6 +96,8 @@ export const toggleQuote = async (
       );
     }
   }
+
+  console.log(98, fullLines);
 
   return {
     lines: fullLines,
