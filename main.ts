@@ -202,13 +202,10 @@ export default class PastetoIndentationPlugin extends Plugin {
             let newMode;
             modeValues.forEach((value, index) => {
               if (value === currentMode) {
-                console.log(206, currentMode, value, index);
                 if (index === modeValues.length - 1) {
-                  console.log(208, modeValues, modeValues[0]);
                   newMode = modeValues[0];
                   return newMode;
                 }
-                console.log(208, modeValues, modeValues[index + 1]);
                 newMode = modeValues[index + 1];
                 return newMode;
               }
