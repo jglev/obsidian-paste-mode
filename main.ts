@@ -1,6 +1,9 @@
 import {
   App,
   Editor,
+  EditorChange,
+  EditorRangeOrCaret,
+  EditorTransaction,
   FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
@@ -128,7 +131,28 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
         }
 
-        editor.setValue(output);
+        console.log(132, editor.getCursor());
+
+        const cursorFrom = editor.getCursor("from");
+        const cursorTo = editor.getCursor("to");
+
+        let transactionChange: EditorChange = {
+          from: cursorFrom,
+          text: output,
+        };
+
+        if (
+          cursorFrom.line === cursorTo.line &&
+          cursorFrom.ch === cursorTo.ch
+        ) {
+          transactionChange = { ...transactionChange, to: cursorTo };
+        }
+
+        const transaction: EditorTransaction = {
+          changes: [transactionChange],
+        };
+
+        editor.transaction(transaction);
 
         // console.log(35, evt, editor, markdownView);
         // console.log(52, evt.clipboardData.getData("text"));
