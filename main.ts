@@ -102,77 +102,60 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         evt.preventDefault();
 
+        let clipboardContents = "";
         let output = "";
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          const clipboardContents = htmlToMarkdown(
+          clipboardContents = htmlToMarkdown(
             evt.clipboardData.getData("text/html")
           );
-
-          const input = (
-            editor
-              .getLine(editor.getCursor("from").line)
-              .slice(0, editor.getCursor("from").ch) + clipboardContents
-          ).split("\n");
-
-          console.log(116, input);
-
+          // htmlToMarkdown() will return a blank string if
+          // there is no HTML to convert. If that is the case,
+          // we will switch to the equivalent Text mode:
           if (clipboardContents === "") {
             if (mode === Mode.Markdown) {
               mode = Mode.Text;
-            } else {
+            }
+            if (mode === Mode.MarkdownBlockquote) {
               mode = Mode.TextBlockquote;
             }
-          }
-          console.log(125, mode);
-          if (mode === Mode.Markdown) {
-            output = pasteText(input);
-          }
-          if (mode === Mode.MarkdownBlockquote) {
-            const toggledText = await toggleQuote(
-              input,
-              this.settings.blockquotePrefix
-            );
-            output = toggledText.lines.join("\n");
           }
         }
 
         if (mode === Mode.Text || mode === Mode.TextBlockquote) {
-          const clipboardContents = evt.clipboardData.getData("text");
-
-          console.log(146, clipboardContents);
-
-          const leadingWhitespaceMatch = editor
-            .getLine(editor.getCursor().line)
-            .match(new RegExp(`^(\\s*)`));
-          const leadingWhitespace =
-            leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
-
-          const input = clipboardContents.split("\n").map((line, i) => {
-            if (i === 0) {
-              return (
-                editor
-                  .getLine(editor.getCursor("from").line)
-                  .slice(0, editor.getCursor("from").ch) + line
-              );
-            }
-
-            return leadingWhitespace + line;
-          });
-
-          if (mode === Mode.Text) {
-            output = input.join("\n");
-          }
-
-          if (mode === Mode.TextBlockquote) {
-            const toggledText = await toggleQuote(
-              input,
-              this.settings.blockquotePrefix
-            );
-            output = toggledText.lines.join("\n");
-          }
+          clipboardContents = evt.clipboardData.getData("text");
         }
 
+        const leadingWhitespaceMatch = editor
+          .getLine(editor.getCursor().line)
+          .match(new RegExp(`^(\\s*)`));
+        const leadingWhitespace =
+          leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
+
+        const input = clipboardContents.split("\n").map((line, i) => {
+          if (i === 0) {
+            return (
+              editor
+                .getLine(editor.getCursor("from").line)
+                .slice(0, editor.getCursor("from").ch) + line
+            );
+          }
+
+          return leadingWhitespace + line;
+        });
+
+        if (mode === Mode.Text || mode === Mode.Markdown) {
+          output = input.join("\n");
+        }
+
+        if (mode === Mode.TextBlockquote || mode === Mode.MarkdownBlockquote) {
+          const toggledText = await toggleQuote(
+            input,
+            this.settings.blockquotePrefix
+          );
+          output = toggledText.lines.join("\n");
+        }
+        
         const cursorFrom = { line: editor.getCursor().line, ch: 0 };
         const cursorTo = editor.getCursor("to");
 
