@@ -57,11 +57,13 @@ class PasteModeModal extends FuzzySuggestModal<number> {
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
+  apiVersion: number;
 }
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
+  apiVersion: 1,
 };
 
 export default class PastetoIndentationPlugin extends Plugin {
