@@ -5,9 +5,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
-    "build": "rollup --config rollup.config.js --environment BUILD:production",
-    "test": "jest --passWithNoTests",
-    "test-dev": "jest --passWithNoTests --watch --verbose --silent=false '__tests__/toggle-quote.ts'"
+    "build": "rollup --config rollup.config.js --environment BUILD:production"
   },
   "keywords": [],
   "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",
