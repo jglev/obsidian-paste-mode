@@ -238,6 +238,15 @@ export default class PastetoIndentationPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "set-paste-mode",
+      name: "Set paste mode",
+      callback: () => {
+        const newMode = new PasteModeModal({ app, onChooseItem });
+        newMode.open();
+      },
+    });
+
     this.statusBar = this.addStatusBarItem();
     this.statusBar.setText(`Paste Mode: ${this.settings.mode}`);
     const onChooseItem = async (item: number): Promise<void> => {

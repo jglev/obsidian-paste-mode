@@ -16,16 +16,16 @@ Paste to Current Indentation takes over the paste functionality within Obsidian.
 1. "Markdown Blockquote" mode: Convert any HTML to Markdown before pasting. Then, paste the result as a blockquote (prepended with the prefix from the plugin's Settings menu -- by default, "`> `").
 1. "Passthrough" mode: Use Obsidian's default paste functionality.
 
-
 The current paste mode is displayed in Obsidian's Status Bar:
 
 ![Status bar showing current paste mode](img/status-bar.png)
 
 ### Switching paste mode
 
-There are four ways to switch paste modes:
+There are multiple ways to switch paste modes:
 
 1. Clicking the status bar paste mode display will bring up a searchable menu with which you can select a new mode.
+1. Open the Command Palette and search for `Paste to Current Indentation: Cycle Paste Mode`. This command is equivalent to clicking the satus bar.
 1. Open the Command Palette and search for `Paste to Current Indentation: Set Paste Mode`. One command per paste mode is provided.
   - These commands could be used, e.g., with the Obsidian [Quick Add plugin](https://github.com/chhoumann/quickadd/blob/master/docs/Choices/MacroChoice.md) to assign a keyboard command for switching to a given mode and then pasting.
 1. Open the Command Palette and search for `Paste to Current Indentation: Cycle Paste Mode`. This command will cycle through the different paste modes (i.e., from Text mode to Text Blockquote mode, to Markdown mode, to Markdown Blockquote mode, to Passthrough mode, back to Text mode, etc.)
