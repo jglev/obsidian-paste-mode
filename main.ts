@@ -145,14 +145,8 @@ export default class PastetoIndentationPlugin extends Plugin {
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
         const input = clipboardContents.split("\n").map((line, i) => {
-          if (i === 0) {
-            return (
-              editor
-                .getLine(editor.getCursor("from").line)
-                .slice(0, editor.getCursor("from").ch) + line
-            );
-          }
-
+          // We will remove leadingWhitespace from line 0 at the end.
+          // It's just here to calculate overall leading whitespace below.
           return leadingWhitespace + line;
         });
 
@@ -165,32 +159,15 @@ export default class PastetoIndentationPlugin extends Plugin {
             input,
             this.settings.blockquotePrefix
           );
+          toggledText.lines[0] = toggledText.lines[0].replace(
+            new RegExp(`^${leadingWhitespace}`),
+            ""
+          );
           output = toggledText.lines.join("\n");
         }
 
-        const cursorFrom = { line: editor.getCursor().line, ch: 0 };
-        const cursorTo = editor.getCursor("to");
-
-        let transactionChange: EditorChange = {
-          from: cursorFrom,
-          text: output,
-        };
-
-        if (
-          cursorFrom.line !== cursorTo.line ||
-          cursorFrom.ch !== cursorTo.ch
-        ) {
-          transactionChange = {
-            ...transactionChange,
-            to: {
-              line: cursorTo.line,
-              ch: editor.getLine(cursorTo.line).length,
-            },
-          };
-        }
-
         const transaction: EditorTransaction = {
-          changes: [transactionChange],
+          replaceSelection: output,
         };
 
         editor.transaction(transaction);
