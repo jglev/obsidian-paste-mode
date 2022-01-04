@@ -1,13 +1,11 @@
 {
   "name": "obsidian-paste-to-current-indentation",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "This plugin allows pasting and marking text as block-quotes at any level of indentation.",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
-    "build": "rollup --config rollup.config.js --environment BUILD:production",
-    "test": "jest --passWithNoTests",
-    "test-dev": "jest --passWithNoTests --watch --verbose --silent=false '__tests__/toggle-quote.ts'"
+    "build": "rollup --config rollup.config.js --environment BUILD:production"
   },
   "keywords": [],
   "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",
