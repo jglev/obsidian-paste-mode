@@ -24,15 +24,27 @@ enum Mode {
 
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
+  public readonly currentValue: Mode;
 
   constructor({
     app,
     onChooseItem,
+    currentValue,
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
+    currentValue: Mode;
   }) {
     super(app);
+
+    this.setPlaceholder(`Current: ${currentValue}`);
+
+    this.setInstructions([
+      {
+        command: `Paste Mode`,
+        purpose: "",
+      },
+    ]);
 
     this.onChooseItem = (patternIndex: number) => {
       onChooseItem(patternIndex);
@@ -242,7 +254,11 @@ export default class PastetoIndentationPlugin extends Plugin {
       id: "set-paste-mode",
       name: "Set paste mode",
       callback: () => {
-        const newMode = new PasteModeModal({ app, onChooseItem });
+        const newMode = new PasteModeModal({
+          app,
+          onChooseItem,
+          currentValue: this.settings.mode,
+        });
         newMode.open();
       },
     });
@@ -255,7 +271,11 @@ export default class PastetoIndentationPlugin extends Plugin {
     };
     const app = this.app;
     this.statusBar.onClickEvent(() => {
-      const newMode = new PasteModeModal({ app, onChooseItem });
+      const newMode = new PasteModeModal({
+        app,
+        onChooseItem,
+        currentValue: this.settings.mode,
+      });
       newMode.open();
     });
   }
