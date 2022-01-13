@@ -145,8 +145,9 @@ export default class PastetoIndentationPlugin extends Plugin {
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
         const input = clipboardContents.split("\n").map((line, i) => {
-          // We will remove leadingWhitespace from line 0 at the end.
-          // It's just here to calculate overall leading whitespace below.
+          if (i === 0) {
+            return line;
+          }
           return leadingWhitespace + line;
         });
 
@@ -156,7 +157,9 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         if (mode === Mode.TextBlockquote || mode === Mode.MarkdownBlockquote) {
           const toggledText = await toggleQuote(
-            input,
+            // We will remove leadingWhitespace from line 0 at the end.
+            // It's just here to calculate overall leading whitespace.
+            [leadingWhitespace + input[0], ...input.slice(1)],
             this.settings.blockquotePrefix
           );
           toggledText.lines[0] = toggledText.lines[0].replace(
