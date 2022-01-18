@@ -159,10 +159,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           output = input.join("\n");
         }
 
-        console.log(162, Mode);
-
         if (mode === Mode.CodeBlock) {
-          console.log(163);
           output = `\`\`\`\n${leadingWhitespace}${input.join(
             "\n"
           )}\n${leadingWhitespace}\`\`\``;
