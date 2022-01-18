@@ -1,7 +1,6 @@
 import {
   App,
   Editor,
-  EditorChange,
   EditorTransaction,
   FuzzySuggestModal,
   htmlToMarkdown,
@@ -19,6 +18,7 @@ enum Mode {
   TextBlockquote = "text-blockquote",
   Markdown = "markdown",
   MarkdownBlockquote = "markdown-blockquote",
+  CodeBlock = "code-block",
   Passthrough = "passthrough",
 }
 
@@ -134,7 +134,11 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
         }
 
-        if (mode === Mode.Text || mode === Mode.TextBlockquote) {
+        if (
+          mode === Mode.Text ||
+          mode === Mode.TextBlockquote ||
+          mode === Mode.CodeBlock
+        ) {
           clipboardContents = evt.clipboardData.getData("text");
         }
 
@@ -153,6 +157,15 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         if (mode === Mode.Text || mode === Mode.Markdown) {
           output = input.join("\n");
+        }
+
+        console.log(162, Mode);
+
+        if (mode === Mode.CodeBlock) {
+          console.log(163);
+          output = `\`\`\`\n${leadingWhitespace}${input.join(
+            "\n"
+          )}\n${leadingWhitespace}\`\`\``;
         }
 
         if (mode === Mode.TextBlockquote || mode === Mode.MarkdownBlockquote) {
