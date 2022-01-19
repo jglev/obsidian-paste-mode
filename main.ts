@@ -19,6 +19,7 @@ enum Mode {
   Markdown = "Markdown",
   MarkdownBlockquote = "Markdown (Blockquote)",
   CodeBlock = "Code Block",
+  CodeBlockBlockquote = "Code Block (Blockquote)",
   Passthrough = "Passthrough",
 }
 
@@ -137,7 +138,8 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (
           mode === Mode.Text ||
           mode === Mode.TextBlockquote ||
-          mode === Mode.CodeBlock
+          mode === Mode.CodeBlock ||
+          mode === Mode.CodeBlockBlockquote
         ) {
           clipboardContents = evt.clipboardData.getData("text");
         }
@@ -148,7 +150,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
-        const input = clipboardContents.split("\n").map((line, i) => {
+        let input = clipboardContents.split("\n").map((line, i) => {
           if (i === 0) {
             return line;
           }
@@ -165,7 +167,15 @@ export default class PastetoIndentationPlugin extends Plugin {
           )}\n${leadingWhitespace}\`\`\``;
         }
 
-        if (mode === Mode.TextBlockquote || mode === Mode.MarkdownBlockquote) {
+        if (mode === Mode.CodeBlockBlockquote) {
+          input = ["```", leadingWhitespace + input, leadingWhitespace + "```"];
+        }
+
+        if (
+          mode === Mode.TextBlockquote ||
+          mode === Mode.MarkdownBlockquote ||
+          mode === Mode.CodeBlockBlockquote
+        ) {
           const toggledText = await toggleQuote(
             // We will remove leadingWhitespace from line 0 at the end.
             // It's just here to calculate overall leading whitespace.
