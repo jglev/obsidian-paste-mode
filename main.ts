@@ -1,7 +1,6 @@
 import {
   App,
   Editor,
-  EditorChange,
   EditorTransaction,
   FuzzySuggestModal,
   htmlToMarkdown,
@@ -15,11 +14,12 @@ import {
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
 enum Mode {
-  Text = "text",
-  TextBlockquote = "text-blockquote",
-  Markdown = "markdown",
-  MarkdownBlockquote = "markdown-blockquote",
-  Passthrough = "passthrough",
+  Text = "Text",
+  TextBlockquote = "Text (Blockquote)",
+  Markdown = "Markdown",
+  MarkdownBlockquote = "Markdown (Blockquote)",
+  CodeBlock = "Code Block",
+  Passthrough = "Passthrough",
 }
 
 class PasteModeModal extends FuzzySuggestModal<number> {
@@ -75,7 +75,7 @@ interface PastetoIndentationPluginSettings {
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
-  apiVersion: 1,
+  apiVersion: 2,
 };
 
 export default class PastetoIndentationPlugin extends Plugin {
@@ -134,7 +134,11 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
         }
 
-        if (mode === Mode.Text || mode === Mode.TextBlockquote) {
+        if (
+          mode === Mode.Text ||
+          mode === Mode.TextBlockquote ||
+          mode === Mode.CodeBlock
+        ) {
           clipboardContents = evt.clipboardData.getData("text");
         }
 
@@ -153,6 +157,12 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         if (mode === Mode.Text || mode === Mode.Markdown) {
           output = input.join("\n");
+        }
+
+        if (mode === Mode.CodeBlock) {
+          output = `\`\`\`\n${leadingWhitespace}${input.join(
+            "\n"
+          )}\n${leadingWhitespace}\`\`\``;
         }
 
         if (mode === Mode.TextBlockquote || mode === Mode.MarkdownBlockquote) {
@@ -262,6 +272,11 @@ export default class PastetoIndentationPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+
+    if (!Object.values(Mode).includes(this.settings.mode)) {
+      this.settings.mode = Object.values(Mode)[0];
+      this.saveSettings();
+    }
   }
 
   async saveSettings() {
