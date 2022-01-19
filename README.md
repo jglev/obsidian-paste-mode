@@ -6,7 +6,7 @@ An [Obsidian](https://obsidian.md/) plugin to paste and manage text, including b
 
 ### "Paste modes"
 
-Paste to Current Indentation takes over the paste functionality within Obsidian. It has six "paste modes," which determine what happens when one pastes text within a file in Obsidian. **All of the below will honor the cursor's current indentation when pasting, except for "Passthrough" mode, which uses Obsidian's default paste functionality.**
+Paste to Current Indentation takes over the paste functionality within Obsidian. It has eight "paste modes," which determine what happens when one pastes text within a file in Obsidian. **All of the below will honor the cursor's current indentation when pasting, except for "Passthrough" mode, which uses Obsidian's default paste functionality.**
 
 ![Demonstration of paste modes](img/all-paste-modes.gif)
 
@@ -14,6 +14,8 @@ Paste to Current Indentation takes over the paste functionality within Obsidian.
 1. "Text Blockquote" mode: Paste the clipboard text as a blockquote (prepended with the prefix from the plugin's Settings menu -- by default, "`> `").
 1. "Markdown" mode: Convert any HTML to markdown before pasting.
 1. "Markdown Blockquote" mode: Convert any HTML to Markdown before pasting. Then, paste the result as a blockquote (prepended with the prefix from the plugin's Settings menu -- by default, "`> `").
+1. "Code Block" mode: Paste the clipboard text within "\`\`\`" code block fences.
+1. "Code Block Blockquote" mode: Paste the clipboard text within "\`\`\`" code block fences as a blockquote.
 1. "Passthrough" mode: Use Obsidian's default paste functionality.
 
 The current paste mode is displayed in Obsidian's Status Bar:
