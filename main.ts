@@ -115,79 +115,8 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         evt.preventDefault();
 
-        let clipboardContents = "";
-        let output = "";
-
-        if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          clipboardContents = htmlToMarkdown(
-            evt.clipboardData.getData("text/html")
-          );
-          // htmlToMarkdown() will return a blank string if
-          // there is no HTML to convert. If that is the case,
-          // we will switch to the equivalent Text mode:
-          if (clipboardContents === "") {
-            if (mode === Mode.Markdown) {
-              mode = Mode.Text;
-            }
-            if (mode === Mode.MarkdownBlockquote) {
-              mode = Mode.TextBlockquote;
-            }
-          }
-        }
-
-        if (
-          mode === Mode.Text ||
-          mode === Mode.TextBlockquote ||
-          mode === Mode.CodeBlock ||
-          mode === Mode.CodeBlockBlockquote
-        ) {
-          clipboardContents = evt.clipboardData.getData("text");
-        }
-
-        const leadingWhitespaceMatch = editor
-          .getLine(editor.getCursor().line)
-          .match(new RegExp(`^(\\s*)`));
-        const leadingWhitespace =
-          leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
-
-        let input = clipboardContents.split("\n").map((line, i) => {
-          if (i === 0) {
-            return line;
-          }
-          return leadingWhitespace + line;
-        });
-
-        if (mode === Mode.Text || mode === Mode.Markdown) {
-          output = input.join("\n");
-        }
-
-        if (mode === Mode.CodeBlock) {
-          output = `\`\`\`\n${leadingWhitespace}${input.join(
-            "\n"
-          )}\n${leadingWhitespace}\`\`\``;
-        }
-
-        if (mode === Mode.CodeBlockBlockquote) {
-          input = ["```", leadingWhitespace + input, leadingWhitespace + "```"];
-        }
-
-        if (
-          mode === Mode.TextBlockquote ||
-          mode === Mode.MarkdownBlockquote ||
-          mode === Mode.CodeBlockBlockquote
-        ) {
-          const toggledText = await toggleQuote(
-            // We will remove leadingWhitespace from line 0 at the end.
-            // It's just here to calculate overall leading whitespace.
-            [leadingWhitespace + input[0], ...input.slice(1)],
-            this.settings.blockquotePrefix
-          );
-          toggledText.lines[0] = toggledText.lines[0].replace(
-            new RegExp(`^${leadingWhitespace}`),
-            ""
-          );
-          output = toggledText.lines.join("\n");
-        }
+        let clipboardContents = await this.extract_clipboard_data_from_evt(mode, evt);
+        let output = await this.extract_output(mode, clipboardContents, editor);
 
         const transaction: EditorTransaction = {
           replaceSelection: output,
@@ -197,6 +126,32 @@ export default class PastetoIndentationPlugin extends Plugin {
       }
     );
 
+    Object.values(Mode).forEach((value) => {
+      this.addCommand({
+        id: `paste-as-${value}`,
+        name: `Paste as ${value}`,
+        editorCallback: async (editor) => 
+        {
+          try {
+            let clipboardContents = await this.extract_clipboard_data(value);
+            let output = await this.extract_output(value, clipboardContents, editor);
+            // console.log("clipboardContents:", clipboardContents);
+            // console.log("output:", output);
+    
+
+            const transaction: EditorTransaction = {
+              replaceSelection: output,
+            };
+
+            editor.transaction(transaction);
+          } catch(error)
+          {
+            new Notice(String(error));
+          }
+          
+        }
+      });
+    });
     Object.values(Mode).forEach((value) => {
       this.addCommand({
         id: `paste-mode-${value}`,
@@ -278,6 +233,127 @@ export default class PastetoIndentationPlugin extends Plugin {
       });
       newMode.open();
     });
+  }
+
+  private async extract_clipboard_data_with_specific_type(clipboard_type: string)
+  {
+    let clipboardItems;
+    try {
+      clipboardItems = await navigator.clipboard.read();
+    } catch(error) {
+      throw error;
+    }
+
+    let text = null;
+    for(let clipboardItem of clipboardItems)
+    {
+      if(clipboardItem.types.indexOf(clipboard_type) != -1)
+      {
+        let blob = await clipboardItem.getType(clipboard_type);
+        text = await blob.text();
+        // console.log(text);
+        break;
+      }
+    }
+    return text;
+  }
+
+  private async extract_clipboard_data(mode: Mode)
+  {
+    let clipboardContents = "";
+    if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+      clipboardContents = await this.extract_clipboard_data_with_specific_type("text/html");
+      clipboardContents = htmlToMarkdown(clipboardContents);
+    }
+
+    if (mode === Mode.Text ||
+      mode === Mode.TextBlockquote ||
+      mode === Mode.CodeBlock ||
+      mode === Mode.CodeBlockBlockquote) {
+      clipboardContents = await this.extract_clipboard_data_with_specific_type("text/plain");
+    }
+
+    return clipboardContents;
+  }
+
+  private async extract_clipboard_data_from_evt(mode: Mode, evt: ClipboardEvent)
+  {
+    let clipboardContents = "";
+    if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+      clipboardContents = htmlToMarkdown(
+        evt.clipboardData.getData("text/html")
+      );
+    }
+
+    if (mode === Mode.Text ||
+      mode === Mode.TextBlockquote ||
+      mode === Mode.CodeBlock ||
+      mode === Mode.CodeBlockBlockquote) {
+      clipboardContents = evt.clipboardData.getData("text");
+    }
+
+    return clipboardContents;
+  }
+
+  private async extract_output(mode: Mode, clipboardContents: string, editor: Editor) {
+    let output = "";
+
+    if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+      // htmlToMarkdown() will return a blank string if
+      // there is no HTML to convert. If that is the case,
+      // we will switch to the equivalent Text mode:
+      if (clipboardContents === "") {
+        if (mode === Mode.Markdown) {
+          mode = Mode.Text;
+        }
+        if (mode === Mode.MarkdownBlockquote) {
+          mode = Mode.TextBlockquote;
+        }
+      }
+    }
+
+    const leadingWhitespaceMatch = editor
+      .getLine(editor.getCursor().line)
+      .match(new RegExp(`^(\\s*)`));
+    const leadingWhitespace = leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
+
+    let input = clipboardContents.split("\n").map((line, i) => {
+      if (i === 0) {
+        return line;
+      }
+      return leadingWhitespace + line;
+    });
+
+    if (mode === Mode.Text || mode === Mode.Markdown) {
+      output = input.join("\n");
+    }
+
+    if (mode === Mode.CodeBlock) {
+      output = `\`\`\`\n${leadingWhitespace}${input.join(
+        "\n"
+      )}\n${leadingWhitespace}\`\`\``;
+    }
+
+    if (mode === Mode.CodeBlockBlockquote) {
+      input = ["```", leadingWhitespace + input, leadingWhitespace + "```"];
+    }
+
+    if (mode === Mode.TextBlockquote ||
+      mode === Mode.MarkdownBlockquote ||
+      mode === Mode.CodeBlockBlockquote) {
+      const toggledText = await toggleQuote(
+        // We will remove leadingWhitespace from line 0 at the end.
+        // It's just here to calculate overall leading whitespace.
+        [leadingWhitespace + input[0], ...input.slice(1)],
+        this.settings.blockquotePrefix
+      );
+      toggledText.lines[0] = toggledText.lines[0].replace(
+        new RegExp(`^${leadingWhitespace}`),
+        ""
+      );
+      output = toggledText.lines.join("\n");
+    }
+    return output
   }
 
   async loadSettings() {
