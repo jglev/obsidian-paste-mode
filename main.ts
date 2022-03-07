@@ -237,6 +237,13 @@ export default class PastetoIndentationPlugin extends Plugin {
 
   private async extract_clipboard_data_with_specific_type(clipboard_type: string)
   {
+    // Try to use `readText` instead of `read()` when possible.
+    // Because On mobile, `navigator.clipboard.read()` will fail due to "permission denied",
+    // while `navigator.clipboard.readText()` works well.
+    if(clipboard_type == 'text/plain')
+    {
+      return await navigator.clipboard.readText();
+    }
     let clipboardItems;
     try {
       clipboardItems = await navigator.clipboard.read();
