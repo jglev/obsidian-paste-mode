@@ -13,7 +13,7 @@ import {
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
-enum Mode {
+export enum Mode {
   Text = "Text",
   TextBlockquote = "Text (Blockquote)",
   Markdown = "Markdown",
