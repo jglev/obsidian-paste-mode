@@ -9,14 +9,11 @@
     "noImplicitAny": true,
     "moduleResolution": "node",
     "importHelpers": true,
-    "esModuleInterop": true,
-    "types": ["node", "jest"],
     "lib": [
       "dom",
       "es5",
       "scripthost",
-      "es2015",
-      "ESNext.String"
+      "es2015"
     ]
   },
   "include": [

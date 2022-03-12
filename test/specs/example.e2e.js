@@ -1,8 +1,6 @@
 const { assert } = require("chai");
 const fs = require("fs");
 
-const { Mode } = require('../../main');
-
 // Note: Supported keyboard key names can be found here:
 // https://w3c.github.io/webdriver/webdriver-spec.html#keyboard-actions
 
