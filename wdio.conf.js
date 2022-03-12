@@ -1,3 +1,5 @@
+const obsidianBinaryPath = process.env.OBSIDIAN_BINARY_PATH
+
 exports.config = {
     //
     // ====================
@@ -58,7 +60,7 @@ exports.config = {
         //
         browserName: 'chrome',
         'goog:chromeOptions': {
-            binary: '/home/jacoblevernier/Obsidian.appimage', // Path to your Electron binary.
+            binary: obsidianBinaryPath, // Path to your Electron binary.
             args: [/* cli arguments */] // Optional, perhaps 'app=' + /path/to/your/app/
         },
         acceptInsecureCerts: true
@@ -185,8 +187,9 @@ exports.config = {
      * @param {Array.<String>} specs List of spec file paths that are to be run
      * @param {String} cid worker id (e.g. 0-0)
      */
-    // beforeSession: function (config, capabilities, specs, cid) {
-    // },
+    beforeSession: function (config, capabilities, specs, cid) {
+        global.obsidianBinaryPath = obsidianBinaryPath // Following https://stackoverflow.com/a/54500343
+    },
     /**
      * Gets executed before test execution begins. At this point you can access to all global
      * variables like `browser`. It is the perfect place to define custom commands.
