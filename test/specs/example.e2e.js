@@ -116,16 +116,20 @@ describe("Plugin", function () {
     - Lorem ipsum 4`;
 
         fs.writeFileSync(path.join('test', 'empty_vault', 'Untitled.md'), testText);
-        await sleep(1);
+        await sleep(3);
 
         // Check the contents of the clipboard:
         await $('.view-content').click({ button: "right" });
         await sleep(1);
         await $$('.menu-item')[4].click(); // "Select all"
+        // await $('.view-content').click();
+        // await sleep(1);
+        // await browser.$('.view-content').keys(['Control', 'a']);
 
         await $('.view-content').click({ button: "right" });
         await sleep(1);
         await $$('.menu-item')[2].click(); // "Cut"
+        // await browser.$('.view-content').keys(['Control', 'x']);
 
         await browser.$('.view-content').keys(['Control', 'p']);
         await sleep(1);
@@ -135,9 +139,10 @@ describe("Plugin", function () {
 
         await $('.view-content').click({ button: "right" });
         await sleep(1);
-        await $$('.menu-item')[4].click(); // "Paste"
+        await $$('.menu-item')[3].click(); // "Paste"
+        // await browser.$('.view-content').keys(['Control', 'v']);
 
-        await sleep(2);
+        await sleep(1);
 
         const pastedText = await $('.view-content').getText();
 
