@@ -209,27 +209,33 @@ export default class PastetoIndentationPlugin extends Plugin {
     });
 
     Object.values(Mode).forEach((value) => {
-      this.addCommand({
-        id: `paste-mode-${value}`,
-        name: `Paste in ${value} Mode`,
-        editorCallback: async (editor: Editor, view: MarkdownView) => {
-          const originalMode = this.settings.mode;
-          changePasteMode(value);
-          const transfer = new DataTransfer();
-          await clipboard.availableFormats().forEach(async (format: string) => {
-            transfer.setData(format, await clipboard.read(format));
-          });
-          this.app.workspace.trigger(
-            "editor-paste",
-            new ClipboardEvent("paste", {
-              clipboardData: transfer,
-            }),
-            editor,
-            view
-          );
-          changePasteMode(originalMode);
-        },
-      });
+      // Passthrough seems not to work with this approach -- perhaps
+      // because event.isTrusted can't be set to true? (I'm unsure.)
+      if (value !== Mode.Passthrough) {
+        this.addCommand({
+          id: `paste-mode-${value}`,
+          name: `Paste in ${value} Mode`,
+          editorCallback: async (editor: Editor, view: MarkdownView) => {
+            const originalMode = this.settings.mode;
+            changePasteMode(value);
+            const transfer = new DataTransfer();
+            await clipboard
+              .availableFormats()
+              .forEach(async (format: string) => {
+                transfer.setData(format, await clipboard.read(format));
+              });
+            this.app.workspace.trigger(
+              "editor-paste",
+              new ClipboardEvent("paste", {
+                clipboardData: transfer,
+              }),
+              editor,
+              view
+            );
+            changePasteMode(originalMode);
+          },
+        });
+      }
     });
 
     Object.values(Mode).forEach((value) => {
