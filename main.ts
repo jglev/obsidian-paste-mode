@@ -100,7 +100,6 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.app.workspace.on(
       "editor-paste",
       async (evt: ClipboardEvent, editor: Editor) => {
-        console.log(evt);
         // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
         // "Check for `evt.defaultPrevented` before attempting to handle this
         // event, and return if it has been already handled."
@@ -110,7 +109,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.clipboardData.types.every((type) => type === "files")) {
           return;
         }
-        console.log(112);
 
         let mode = this.settings.mode;
 
@@ -215,28 +213,21 @@ export default class PastetoIndentationPlugin extends Plugin {
         id: `paste-mode-${value}`,
         name: `Paste in ${value} Mode`,
         editorCallback: async (editor: Editor, view: MarkdownView) => {
+          const originalMode = this.settings.mode;
           changePasteMode(value);
           const transfer = new DataTransfer();
-          console.log(220, clipboard);
-          console.log(220, clipboard.availableFormats());
           await clipboard.availableFormats().forEach(async (format: string) => {
-            console.log(223, format);
             transfer.setData(format, await clipboard.read(format));
           });
-          const clipboardData = await clipboard.readText();
-          console.log(221, transfer);
-          console.log(222, clipboard, clipboardData);
           this.app.workspace.trigger(
             "editor-paste",
             new ClipboardEvent("paste", {
               clipboardData: transfer,
-              // dataType:,
-              // data:
             }),
             editor,
             view
           );
-          console.log(226);
+          changePasteMode(originalMode);
         },
       });
     });
