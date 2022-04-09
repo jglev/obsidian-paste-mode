@@ -271,6 +271,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "toggle-blockquote-at-current-indentation",
       name: "Toggle blockquote at current indentation",
+      icon: "folder",
       checkCallback: (checking: boolean) => {
         let view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
