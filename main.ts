@@ -12,7 +12,7 @@ import {
   View,
 } from "obsidian";
 
-import clipboard from "electron";
+import { clipboard } from "electron";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
