@@ -4,8 +4,9 @@
   "description": "This plugin allows pasting and marking text as block-quotes at any level of indentation.",
   "main": "main.js",
   "scripts": {
-    "dev": "node esbuild.config.mjs",
-    "build": "node esbuild.config.mjs production"
+    "icons": "node createIconsDict.js",
+    "dev": "yarn icons && node esbuild.config.mjs",
+    "build": "yarn icons && node esbuild.config.mjs production"
   },
   "keywords": [],
   "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",

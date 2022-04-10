@@ -1,4 +1,5 @@
 import {
+  addIcon,
   App,
   Editor,
   EditorTransaction,
@@ -9,12 +10,13 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
-  View,
 } from "obsidian";
 
 import { clipboard } from "electron";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
+
+import * as pluginIcons from "./icons.json";
 
 enum Mode {
   Text = "Text",
@@ -88,6 +90,10 @@ export default class PastetoIndentationPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
+
+    for (const [key, value] of Object.entries(pluginIcons)) {
+      addIcon(key, value);
+    }
 
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
@@ -202,7 +208,8 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     Object.values(Mode).forEach((value) => {
       this.addCommand({
-        id: `paste-mode-${value}`,
+        id: `set-paste-mode-${value}`,
+        icon: `pasteIcons-{value}`,
         name: `Set Paste Mode to ${value}`,
         callback: () => changePasteMode(value),
       });
@@ -213,7 +220,8 @@ export default class PastetoIndentationPlugin extends Plugin {
       // because event.isTrusted can't be set to true? (I'm unsure.)
       if (value !== Mode.Passthrough) {
         this.addCommand({
-          id: `paste-mode-${value}`,
+          id: `paste-in-mode-${value}`,
+          icon: `pasteIcons-{value}-hourglass`,
           name: `Paste in ${value} Mode`,
           editorCallback: async (editor: Editor, view: MarkdownView) => {
             const originalMode = this.settings.mode;
@@ -241,6 +249,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     Object.values(Mode).forEach((value) => {
       this.addCommand({
         id: `cycle-paste-mode`,
+        icon: `pasteIcons-clipboard-cycle`,
         name: `Cycle Paste Mode`,
         callback: async () => {
           const nextMode = (): Mode => {
@@ -271,7 +280,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "toggle-blockquote-at-current-indentation",
       name: "Toggle blockquote at current indentation",
-      icon: "folder",
+      icon: "pasteIcons-quote-text",
       checkCallback: (checking: boolean) => {
         let view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
@@ -286,6 +295,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addCommand({
       id: "set-paste-mode",
+      icon: "pasteIcons-clipboard-question",
       name: "Set paste mode",
       callback: () => {
         const newMode = new PasteModeModal({
@@ -358,7 +368,9 @@ class SettingTab extends PluginSettingTab {
             this.plugin.settings.mode =
               (value as Mode) || DEFAULT_SETTINGS.mode;
             await this.plugin.saveSettings();
-            this.plugin.statusBar.setText(`Paste Mode: ${this.plugin.settings.mode}`);
+            this.plugin.statusBar.setText(
+              `Paste Mode: ${this.plugin.settings.mode}`
+            );
           })
       );
 
