@@ -12,6 +12,8 @@ Unfortunately, as of this writing, Excalidraw is [not able to embed fonts](https
 1. Select all, and click `Path -> Object to Path`
 1. To export the individual icons:
    1. Open a second file in Inkscape.
-   1. Paste an icon from the first file into the new file.
-   1. In the new file, click `Edit -> Resize Page to Selection`
+       1. In the new Inkscape file, click `Edit -> XML Editor...`.
+       1. In the XML Editor, click the topmost (i.e., `<svg>`) node, and set the `ViewBox` property to [`0 0 100 100`](https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L265).
+   1. Paste an icon from the first file into the new file. Resize the icon to fit the `0 0 100 100` ViewBox set above.  
+      _Note that Obsidian will cut off part of the edges of the icon when rendering it. Thus, icons should not touch the edge of the canvas._
    1. Click `File -> Save a Copy...`, and save an SVG of the icon.

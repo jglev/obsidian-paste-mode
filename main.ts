@@ -84,16 +84,16 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   apiVersion: 2,
 };
 
+for (const [key, value] of Object.entries(pluginIcons)) {
+  addIcon(key, value);
+}
+
 export default class PastetoIndentationPlugin extends Plugin {
   settings: PastetoIndentationPluginSettings;
   statusBar: HTMLElement;
 
   async onload() {
     await this.loadSettings();
-
-    for (const [key, value] of Object.entries(pluginIcons)) {
-      addIcon(key, value);
-    }
 
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
@@ -206,22 +206,25 @@ export default class PastetoIndentationPlugin extends Plugin {
       }
     );
 
-    Object.values(Mode).forEach((value) => {
+    Object.values(Mode).forEach((value, index) => {
+      const key = Object.keys(Mode)[index];
       this.addCommand({
-        id: `set-paste-mode-${value}`,
-        icon: `pasteIcons-{value}`,
+        id: `set-paste-mode-${key}`,
+        icon: `pasteIcons-${key}`,
         name: `Set Paste Mode to ${value}`,
         callback: () => changePasteMode(value),
       });
     });
 
-    Object.values(Mode).forEach((value) => {
+    Object.values(Mode).forEach((value, index) => {
       // Passthrough seems not to work with this approach -- perhaps
       // because event.isTrusted can't be set to true? (I'm unsure.)
       if (value !== Mode.Passthrough) {
+        const key = Object.keys(Mode)[index];
+
         this.addCommand({
-          id: `paste-in-mode-${value}`,
-          icon: `pasteIcons-{value}-hourglass`,
+          id: `paste-in-mode-${key}`,
+          icon: `pasteIcons-${key}-hourglass`,
           name: `Paste in ${value} Mode`,
           editorCallback: async (editor: Editor, view: MarkdownView) => {
             const originalMode = this.settings.mode;
