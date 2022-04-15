@@ -175,7 +175,12 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.CodeBlockBlockquote) {
-          input = ["```", leadingWhitespace + input, leadingWhitespace + "```"];
+          input = [
+            "```",
+            leadingWhitespace + input[0],
+            ...input.slice(1),
+            leadingWhitespace + "```",
+          ];
         }
 
         if (
