@@ -29,19 +29,24 @@ enum Mode {
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
   public readonly currentValue: Mode;
+  public readonly showCurrentValue: boolean;
 
   constructor({
     app,
     onChooseItem,
     currentValue,
+    showCurrentValue,
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
     currentValue: Mode;
+    showCurrentValue: boolean;
   }) {
     super(app);
 
-    this.setPlaceholder(`Current: ${currentValue}`);
+    if (showCurrentValue) {
+      this.setPlaceholder(`Current: ${currentValue}`);
+    }
 
     this.setInstructions([
       {
@@ -219,6 +224,34 @@ export default class PastetoIndentationPlugin extends Plugin {
       });
     });
 
+    const pasteInMode = async (
+      value: Mode,
+      editor: Editor,
+      view: MarkdownView
+    ) => {
+      const originalMode = this.settings.mode;
+      changePasteMode(value);
+      const transfer = new DataTransfer();
+      const clipboardData = await navigator.clipboard.read();
+      for (let i = 0; i < clipboardData.length; i++) {
+        for (const format of clipboardData[i].types) {
+          const typeContents = await (
+            await clipboardData[i].getType(format)
+          ).text();
+          transfer.setData(format, typeContents);
+        }
+      }
+      this.app.workspace.trigger(
+        "editor-paste",
+        new ClipboardEvent("paste", {
+          clipboardData: transfer,
+        }),
+        editor,
+        view
+      );
+      changePasteMode(originalMode);
+    };
+
     Object.values(Mode).forEach((value, index) => {
       // Passthrough seems not to work with this approach -- perhaps
       // because event.isTrusted can't be set to true? (I'm unsure.)
@@ -230,27 +263,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           icon: `pasteIcons-${key}-hourglass`,
           name: `Paste in ${value} Mode`,
           editorCallback: async (editor: Editor, view: MarkdownView) => {
-            const originalMode = this.settings.mode;
-            changePasteMode(value);
-            const transfer = new DataTransfer();
-            const clipboardData = await navigator.clipboard.read();
-            for (let i = 0; i < clipboardData.length; i++) {
-              for (const format of clipboardData[i].types) {
-                const typeContents = await (
-                  await clipboardData[i].getType(format)
-                ).text();
-                transfer.setData(format, typeContents);
-              }
-            }
-            this.app.workspace.trigger(
-              "editor-paste",
-              new ClipboardEvent("paste", {
-                clipboardData: transfer,
-              }),
-              editor,
-              view
-            );
-            changePasteMode(originalMode);
+            await pasteInMode(value, editor, view);
           },
         });
       }
@@ -312,6 +325,25 @@ export default class PastetoIndentationPlugin extends Plugin {
           app,
           onChooseItem,
           currentValue: this.settings.mode,
+          showCurrentValue: true,
+        });
+        newMode.open();
+      },
+    });
+
+    this.addCommand({
+      id: "paste-in-mode-interactive",
+      icon: "pasteIcons-clipboard-question",
+      name: "Paste in mode (Interactive)",
+      editorCallback: async (editor: Editor, view: MarkdownView) => {
+        const newMode = new PasteModeModal({
+          app,
+          onChooseItem: async (item: number): Promise<void> => {
+            const selection = Object.values(Mode)[item];
+            await pasteInMode(selection, editor, view);
+          },
+          currentValue: null,
+          showCurrentValue: false,
         });
         newMode.open();
       },
@@ -329,6 +361,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         app,
         onChooseItem,
         currentValue: this.settings.mode,
+        showCurrentValue: true,
       });
       newMode.open();
     });
