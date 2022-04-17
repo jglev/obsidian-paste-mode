@@ -15,6 +15,11 @@ import {
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
 
 import * as pluginIcons from "./icons.json";
+declare module "obsidian" {
+    interface App {
+        isMobile: boolean;
+    }
+}
 
 enum Mode {
   Text = "Text",
@@ -232,15 +237,21 @@ export default class PastetoIndentationPlugin extends Plugin {
       const originalMode = this.settings.mode;
       changePasteMode(value);
       const transfer = new DataTransfer();
-      const clipboardData = await navigator.clipboard.read();
-      for (let i = 0; i < clipboardData.length; i++) {
-        for (const format of clipboardData[i].types) {
-          const typeContents = await (
-            await clipboardData[i].getType(format)
-          ).text();
-          transfer.setData(format, typeContents);
+      if (!this.app.isMobile) {
+        const clipboardData = await navigator.clipboard.read();
+        for (let i = 0; i < clipboardData.length; i++) {
+          for (const format of clipboardData[i].types) {
+            const typeContents = await (
+              await clipboardData[i].getType(format)
+            ).text();
+            transfer.setData(format, typeContents);
+          }
         }
+      } else {
+        const clipboardData = await navigator.clipboard.readText();
+        transfer.setData("text/plain", clipboardData);
       }
+
       this.app.workspace.trigger(
         "editor-paste",
         new ClipboardEvent("paste", {
