@@ -94,9 +94,20 @@ for (const [key, value] of Object.entries(pluginIcons)) {
 export default class PastetoIndentationPlugin extends Plugin {
   settings: PastetoIndentationPluginSettings;
   statusBar: HTMLElement;
+  clipboardReadWorks: boolean;
 
   async onload() {
     await this.loadSettings();
+
+    this.clipboardReadWorks = false;
+    try {
+      await navigator.clipboard.read();
+      this.clipboardReadWorks = true;
+    } catch (error) {
+      console.log(
+        "Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the paste-in-mode commands for Markdown and Markdown (Blockquote) modes."
+      );
+    }
 
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
@@ -229,43 +240,78 @@ export default class PastetoIndentationPlugin extends Plugin {
       editor: Editor,
       view: MarkdownView
     ) => {
+      // This follows https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/read#browser_compatibility,
+      // for requesting access to the .read() (vs. .readText())
+      // clipboard method:
       const originalMode = this.settings.mode;
       changePasteMode(value);
-      const transfer = new DataTransfer();
-      const clipboardData = await navigator.clipboard.read();
-      for (let i = 0; i < clipboardData.length; i++) {
-        for (const format of clipboardData[i].types) {
-          const typeContents = await (
-            await clipboardData[i].getType(format)
-          ).text();
-          transfer.setData(format, typeContents);
+      if (this.clipboardReadWorks) {
+        // const permission = await navigator.permissions.query({
+        //   // Using 'as PermissionName' is a workaround from
+        //   // https://github.com/microsoft/TypeScript/issues/33923#issuecomment-743062954
+        //   name: "clipboard-read" as PermissionName,
+        // });
+        // if (permission.state === "denied") {
+        //   throw new Error("Not allowed to read clipboard.");
+        // }
+        const transfer = new DataTransfer();
+        if (this.clipboardReadWorks) {
+          const clipboardData = await navigator.clipboard.read();
+          for (let i = 0; i < clipboardData.length; i++) {
+            for (const format of clipboardData[i].types) {
+              const typeContents = await (
+                await clipboardData[i].getType(format)
+              ).text();
+              transfer.setData(format, typeContents);
+            }
+          }
+        } else {
+          transfer.setData(await navigator.clipboard.readText(), "text/plain");
         }
+        this.app.workspace.trigger(
+          "editor-paste",
+          new ClipboardEvent("paste", {
+            clipboardData: transfer,
+          }),
+          editor,
+          view
+        );
+        changePasteMode(originalMode);
       }
-      this.app.workspace.trigger(
-        "editor-paste",
-        new ClipboardEvent("paste", {
-          clipboardData: transfer,
-        }),
-        editor,
-        view
-      );
-      changePasteMode(originalMode);
     };
 
     Object.values(Mode).forEach((value, index) => {
       // Passthrough seems not to work with this approach -- perhaps
       // because event.isTrusted can't be set to true? (I'm unsure.)
       if (value !== Mode.Passthrough) {
-        const key = Object.keys(Mode)[index];
+        if (
+          (value !== Mode.Markdown && value === Mode.MarkdownBlockquote) ||
+          this.clipboardReadWorks
+        ) {
+          const key = Object.keys(Mode)[index];
 
-        this.addCommand({
-          id: `paste-in-mode-${key}`,
-          icon: `pasteIcons-${key}-hourglass`,
-          name: `Paste in ${value} Mode`,
-          editorCallback: async (editor: Editor, view: MarkdownView) => {
-            await pasteInMode(value, editor, view);
-          },
-        });
+          this.addCommand({
+            id: `paste-in-mode-${key}`,
+            icon: `pasteIcons-${key}-hourglass`,
+            name: `Paste in ${value} Mode`,
+            editorCallback: async (editor: Editor, view: MarkdownView) => {
+              await pasteInMode(value, editor, view);
+            },
+          });
+        } else {
+          const key = Object.keys(Mode)[index];
+
+          this.addCommand({
+            id: `paste-in-mode-${key}`,
+            icon: `pasteIcons-${key}-hourglass`,
+            name: `Paste in ${value} Mode`,
+            editorCallback: async () => {
+              new Notice(
+                `The "Paste in ${value} Mode" command is disabled on this platform because reading non-text data from the clipboard is not possible.`
+              );
+            },
+          });
+        }
       }
     });
 
