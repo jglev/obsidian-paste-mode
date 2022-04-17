@@ -105,7 +105,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       this.clipboardReadWorks = true;
     } catch (error) {
       console.log(
-        "Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the paste-in-mode commands for Markdown and Markdown (Blockquote) modes."
+        "paste-to-current-indentation: Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the paste-in-mode commands for Markdown and Markdown (Blockquote) modes."
       );
     }
 
@@ -245,39 +245,29 @@ export default class PastetoIndentationPlugin extends Plugin {
       // clipboard method:
       const originalMode = this.settings.mode;
       changePasteMode(value);
+      const transfer = new DataTransfer();
       if (this.clipboardReadWorks) {
-        // const permission = await navigator.permissions.query({
-        //   // Using 'as PermissionName' is a workaround from
-        //   // https://github.com/microsoft/TypeScript/issues/33923#issuecomment-743062954
-        //   name: "clipboard-read" as PermissionName,
-        // });
-        // if (permission.state === "denied") {
-        //   throw new Error("Not allowed to read clipboard.");
-        // }
-        const transfer = new DataTransfer();
-        if (this.clipboardReadWorks) {
-          const clipboardData = await navigator.clipboard.read();
-          for (let i = 0; i < clipboardData.length; i++) {
-            for (const format of clipboardData[i].types) {
-              const typeContents = await (
-                await clipboardData[i].getType(format)
-              ).text();
-              transfer.setData(format, typeContents);
-            }
+        const clipboardData = await navigator.clipboard.read();
+        for (let i = 0; i < clipboardData.length; i++) {
+          for (const format of clipboardData[i].types) {
+            const typeContents = await (
+              await clipboardData[i].getType(format)
+            ).text();
+            transfer.setData(format, typeContents);
           }
-        } else {
-          transfer.setData(await navigator.clipboard.readText(), "text/plain");
         }
-        this.app.workspace.trigger(
-          "editor-paste",
-          new ClipboardEvent("paste", {
-            clipboardData: transfer,
-          }),
-          editor,
-          view
-        );
-        changePasteMode(originalMode);
+      } else {
+        transfer.setData(await navigator.clipboard.readText(), "text/plain");
       }
+      this.app.workspace.trigger(
+        "editor-paste",
+        new ClipboardEvent("paste", {
+          clipboardData: transfer,
+        }),
+        editor,
+        view
+      );
+      changePasteMode(originalMode);
     };
 
     Object.values(Mode).forEach((value, index) => {
@@ -296,19 +286,6 @@ export default class PastetoIndentationPlugin extends Plugin {
             name: `Paste in ${value} Mode`,
             editorCallback: async (editor: Editor, view: MarkdownView) => {
               await pasteInMode(value, editor, view);
-            },
-          });
-        } else {
-          const key = Object.keys(Mode)[index];
-
-          this.addCommand({
-            id: `paste-in-mode-${key}`,
-            icon: `pasteIcons-${key}-hourglass`,
-            name: `Paste in ${value} Mode`,
-            editorCallback: async () => {
-              new Notice(
-                `The "Paste in ${value} Mode" command is disabled on this platform because reading non-text data from the clipboard is not possible.`
-              );
             },
           });
         }
@@ -441,6 +418,18 @@ class SettingTab extends PluginSettingTab {
     containerEl.empty();
 
     containerEl.createEl("h2", { text: "Paste to Current Indentation" });
+
+    if (!this.plugin.clipboardReadWorks) {
+      const noticeDiv = containerEl.createDiv();
+      noticeDiv
+        .createEl("span", { text: "Notice: " })
+        .addClass("paste-to-current-indentation-settings-notice");
+      noticeDiv
+        .createEl("span", {
+          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" commands have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
+        })
+        .addClass("paste-to-current-indentation-settings-notice-text");
+    }
 
     new Setting(containerEl)
       .setName("Paste Mode")
