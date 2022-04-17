@@ -118,6 +118,7 @@ export default class PastetoIndentationPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // Test whether the clipboard allows .read() (vs. just .readText()):
     this.clipboardReadWorks = false;
     try {
       await navigator.clipboard.read();
