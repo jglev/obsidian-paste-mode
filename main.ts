@@ -30,19 +30,24 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
   public readonly currentValue: Mode;
   public readonly showCurrentValue: boolean;
+  public readonly clipboardReadWorks: boolean;
 
   constructor({
     app,
     onChooseItem,
     currentValue,
     showCurrentValue,
+    clipboardReadWorks,
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
     currentValue: Mode;
     showCurrentValue: boolean;
+    clipboardReadWorks: boolean;
   }) {
     super(app);
+
+    this.clipboardReadWorks = clipboardReadWorks;
 
     if (showCurrentValue) {
       this.setPlaceholder(`Current: ${currentValue}`);
@@ -67,7 +72,21 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 
   getItems(): number[] {
-    return Object.keys(Mode).map((key, index) => index);
+    const filteredModes = Object.keys(Mode)
+      .map((key, index) => {
+        if (
+          Object.values(Mode)[index] !== Mode.Passthrough &&
+          ((Object.values(Mode)[index] !== Mode.Markdown &&
+            Object.values(Mode)[index] !== Mode.MarkdownBlockquote) ||
+            this.clipboardReadWorks === true)
+        ) {
+          return index;
+        } else {
+          return null;
+        }
+      })
+      .filter((originalIndex) => originalIndex !== null);
+    return filteredModes;
   }
 
   getItemText(index: number): string {
@@ -105,7 +124,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       this.clipboardReadWorks = true;
     } catch (error) {
       console.log(
-        "paste-to-current-indentation: Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the paste-in-mode commands for Markdown and Markdown (Blockquote) modes."
+        `paste-to-current-indentation: Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" commands. Error: "${error}"`
       );
     }
 
@@ -257,7 +276,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
         }
       } else {
-        transfer.setData(await navigator.clipboard.readText(), "text/plain");
+        transfer.setData("text/plain", await navigator.clipboard.readText());
       }
       this.app.workspace.trigger(
         "editor-paste",
@@ -275,8 +294,8 @@ export default class PastetoIndentationPlugin extends Plugin {
       // because event.isTrusted can't be set to true? (I'm unsure.)
       if (value !== Mode.Passthrough) {
         if (
-          (value !== Mode.Markdown && value === Mode.MarkdownBlockquote) ||
-          this.clipboardReadWorks
+          (value !== Mode.Markdown && value !== Mode.MarkdownBlockquote) ||
+          this.clipboardReadWorks === true
         ) {
           const key = Object.keys(Mode)[index];
 
@@ -349,6 +368,10 @@ export default class PastetoIndentationPlugin extends Plugin {
           onChooseItem,
           currentValue: this.settings.mode,
           showCurrentValue: true,
+          // This is set to true because clipboard.read()
+          // won't be used directly, so modes don't need to
+          // be filtered as they do elsewhere:
+          clipboardReadWorks: true,
         });
         newMode.open();
       },
@@ -367,6 +390,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           },
           currentValue: null,
           showCurrentValue: false,
+          clipboardReadWorks: this.clipboardReadWorks,
         });
         newMode.open();
       },
@@ -385,6 +409,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         onChooseItem,
         currentValue: this.settings.mode,
         showCurrentValue: true,
+        clipboardReadWorks: this.clipboardReadWorks,
       });
       newMode.open();
     });
