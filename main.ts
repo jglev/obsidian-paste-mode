@@ -7,6 +7,7 @@ import {
   htmlToMarkdown,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
@@ -119,15 +120,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     await this.loadSettings();
 
     // Test whether the clipboard allows .read() (vs. just .readText()):
-    this.clipboardReadWorks = false;
-    try {
-      await navigator.clipboard.read();
-      this.clipboardReadWorks = true;
-    } catch (error) {
-      console.log(
-        `paste-to-current-indentation: Reading non-text data from the clipboard does not work with this version of Obsidian. Disabling the "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" commands. Error: "${error}"`
-      );
-    }
+    this.clipboardReadWorks = Platform.isDesktopApp;
 
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
