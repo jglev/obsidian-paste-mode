@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   id="svg1578"
+   version="1.1"
+   viewBox="0 0 100 100"
+   height="100"
+   width="100">
+  <defs
+     id="defs1572" />
+  <metadata
+     id="metadata1575">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     transform="translate(-5.5390738,11.028048)"
+     id="layer1">
+    <g
+       id="g110"
+       transform="matrix(2.1290806,0,0,2.1290806,15.086542,-6.3987556)"
+       style="stroke-linecap:round">
+      <path
+         id="path108"
+         d="M 9.5,0 M 9.5,0 C 13.66,0 17.83,0 28.5,0 M 9.5,0 C 16.19,0 22.88,0 28.5,0 M 28.5,0 C 34.83,0 38,3.17 38,9.5 M 28.5,0 C 34.83,0 38,3.17 38,9.5 M 38,9.5 C 38,18.32 38,27.14 38,33.12 M 38,9.5 C 38,18.21 38,26.93 38,33.12 M 38,33.12 C 38,39.45 34.83,42.62 28.5,42.62 M 38,33.12 C 38,39.45 34.83,42.62 28.5,42.62 M 28.5,42.62 C 21.93,42.62 15.35,42.62 9.5,42.62 M 28.5,42.62 C 22.57,42.62 16.64,42.62 9.5,42.62 M 9.5,42.62 C 3.17,42.62 0,39.45 0,33.12 M 9.5,42.62 C 3.17,42.62 0,39.45 0,33.12 M 0,33.12 C 0,25.23 0,17.34 0,9.5 M 0,33.12 C 0,26.97 0,20.83 0,9.5 M 0,9.5 C 0,3.17 3.17,0 9.5,0 M 0,9.5 C 0,3.17 3.17,0 9.5,0"
+         style="fill:none;stroke:#000000;stroke-width:2" />
+    </g>
+    <g
+       id="g114"
+       transform="matrix(2.1290806,0,0,2.1290806,40.896047,-6.2078536)"
+       style="stroke-linecap:round">
+      <path
+         id="path112"
+         d="M 1.41,0 M 1.41,0 C 4.33,0 7.25,0 12.34,0 M 1.41,0 C 4.82,0 8.22,0 12.34,0 M 12.34,0 C 13.28,0 13.76,0.47 13.76,1.41 M 12.34,0 C 13.28,0 13.76,0.47 13.76,1.41 M 13.76,1.41 C 13.76,2.43 13.76,3.44 13.76,4.24 M 13.76,1.41 C 13.76,2.22 13.76,3.02 13.76,4.24 M 13.76,4.24 C 13.76,5.18 13.28,5.65 12.34,5.65 M 13.76,4.24 C 13.76,5.18 13.28,5.65 12.34,5.65 M 12.34,5.65 C 9.31,5.65 6.28,5.65 1.41,5.65 M 12.34,5.65 C 10.06,5.65 7.78,5.65 1.41,5.65 M 1.41,5.65 C 0.47,5.65 0,5.18 0,4.24 M 1.41,5.65 C 0.47,5.65 0,5.18 0,4.24 M 0,4.24 C 0,3.67 0,3.11 0,1.41 M 0,4.24 C 0,3.22 0,2.21 0,1.41 M 0,1.41 C 0,0.47 0.47,0 1.41,0 M 0,1.41 C 0,0.47 0.47,0 1.41,0"
+         style="fill:none;stroke:#000000;stroke-width:2" />
+    </g>
+    <g
+       transform="matrix(2.1290806,0,0,2.1290806,-325.92542,-27.689561)"
+       id="g128"
+       style="stroke-linecap:round">
+      <g
+         id="g118"
+         transform="translate(170.75262,32.384287)">
+        <path
+           id="path116"
+           d="M 0,0 C 2.81,0 14.03,0 16.83,0 M 0,0 C 2.81,0 14.03,0 16.83,0"
+           style="fill:none;stroke:#000000;stroke-width:2" />
+      </g>
+      <g
+         id="g122"
+         transform="translate(170.75262,32.384287)">
+        <path
+           id="path120"
+           d="M 8.92,2.88 C 10.74,2.22 12.55,1.56 16.83,0 M 8.92,2.88 C 12.01,1.76 15.09,0.64 16.83,0"
+           style="fill:none;stroke:#000000;stroke-width:2" />
+      </g>
+      <g
+         id="g126"
+         transform="translate(170.75262,32.384287)">
+        <path
+           id="path124"
+           d="M 8.92,-2.88 C 10.74,-2.22 12.55,-1.56 16.83,0 M 8.92,-2.88 C 12.01,-1.76 15.09,-0.64 16.83,0"
+           style="fill:none;stroke:#000000;stroke-width:2" />
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,1 +1,8 @@
-/* Currently, there are no custom styles associated with this plugin. */
+.paste-to-current-indentation-settings-notice {
+  color: var(--text-error);
+  font-weight: bold;
+}
+
+.paste-to-current-indentation-settings-notice-text {
+  font-style: italic;
+}

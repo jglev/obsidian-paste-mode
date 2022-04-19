@@ -63,6 +63,15 @@ The documentation below is retained from the [Obsidian Sample Plugin](https://gi
 - Reload Obsidian to load the new version of the plugin.
 - For updates to the Obsidian API run `yarn` in the command line under this repo's folder.
 
+## Developing for mobile
+
+Mobile development can be facilitated using the following workflow:
+
+1. Install the [Mobile Hot Reload plugin](https://github.com/pjeby/hot-reload)
+1. Run `yarn dev` with files set to sync to mobile via, e.g., Syncthing or Dropbox.
+1. Follow [the advice in this post](https://forum.obsidian.md/t/debugging-obsidian-mobile-plugins/20913):
+    > How to test plugins on Android I think you need to have ADB on your computer installed (I always had that installed; if the following directions don’t work without it, install it); on your android phone you have to enable ADB (it’s under developer settings [tap the build number three times to get these settings]); then connect the phone to your computer over USB; open chrome (or chromium based browser should also work) and type chrome://inspect in the browser. Open obsidian on your phone, then it should appear in the browser. You will have the console and the inspector like you have for desktop Obsidian
+
 ## Releasing new releases
 
 - Update `manifest.json` with the new version number, such as `1.0.1`, and the minimum Obsidian version required for the latest release.
@@ -70,12 +79,6 @@ The documentation below is retained from the [Obsidian Sample Plugin](https://gi
 - Create new GitHub release using the new version number as the "Tag version". Use the exact version number (i.e., do not include a prefix `v`). See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
 - Upload the files `manifest.json`, `main.js`, and `styles.css` as binary attachments.
 - Publish the release.
-
-## Adding the plugin to the community plugin list
-
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of the repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add the plugin.
 
 ## Manually installing the plugin
 

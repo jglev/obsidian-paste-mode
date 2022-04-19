@@ -1,4 +1,5 @@
 import {
+  addIcon,
   App,
   Editor,
   EditorTransaction,
@@ -6,12 +7,15 @@ import {
   htmlToMarkdown,
   MarkdownView,
   Notice,
+  Platform,
   Plugin,
   PluginSettingTab,
   Setting,
 } from "obsidian";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
+
+import * as pluginIcons from "./icons.json";
 
 enum Mode {
   Text = "Text",
@@ -26,19 +30,29 @@ enum Mode {
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
   public readonly currentValue: Mode;
+  public readonly showCurrentValue: boolean;
+  public readonly clipboardReadWorks: boolean;
 
   constructor({
     app,
     onChooseItem,
     currentValue,
+    showCurrentValue,
+    clipboardReadWorks,
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
     currentValue: Mode;
+    showCurrentValue: boolean;
+    clipboardReadWorks: boolean;
   }) {
     super(app);
 
-    this.setPlaceholder(`Current: ${currentValue}`);
+    this.clipboardReadWorks = clipboardReadWorks;
+
+    if (showCurrentValue) {
+      this.setPlaceholder(`Current: ${currentValue}`);
+    }
 
     this.setInstructions([
       {
@@ -59,7 +73,21 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 
   getItems(): number[] {
-    return Object.keys(Mode).map((key, index) => index);
+    const filteredModes = Object.keys(Mode)
+      .map((key, index) => {
+        if (
+          Object.values(Mode)[index] !== Mode.Passthrough &&
+          ((Object.values(Mode)[index] !== Mode.Markdown &&
+            Object.values(Mode)[index] !== Mode.MarkdownBlockquote) ||
+            this.clipboardReadWorks === true)
+        ) {
+          return index;
+        } else {
+          return null;
+        }
+      })
+      .filter((originalIndex) => originalIndex !== null);
+    return filteredModes;
   }
 
   getItemText(index: number): string {
@@ -79,12 +107,20 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   apiVersion: 2,
 };
 
+for (const [key, value] of Object.entries(pluginIcons)) {
+  addIcon(key, value);
+}
+
 export default class PastetoIndentationPlugin extends Plugin {
   settings: PastetoIndentationPluginSettings;
   statusBar: HTMLElement;
+  clipboardReadWorks: boolean;
 
   async onload() {
     await this.loadSettings();
+
+    // Test whether the clipboard allows .read() (vs. just .readText()):
+    this.clipboardReadWorks = Platform.isDesktopApp;
 
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
@@ -168,7 +204,12 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.CodeBlockBlockquote) {
-          input = ["```", leadingWhitespace + input, leadingWhitespace + "```"];
+          input = [
+            "```",
+            leadingWhitespace + input[0],
+            ...input.slice(1),
+            leadingWhitespace + "```",
+          ];
         }
 
         if (
@@ -197,17 +238,77 @@ export default class PastetoIndentationPlugin extends Plugin {
       }
     );
 
-    Object.values(Mode).forEach((value) => {
+    Object.values(Mode).forEach((value, index) => {
+      const key = Object.keys(Mode)[index];
       this.addCommand({
-        id: `paste-mode-${value}`,
+        id: `set-paste-mode-${key}`,
+        icon: `pasteIcons-${key}`,
         name: `Set Paste Mode to ${value}`,
         callback: () => changePasteMode(value),
       });
     });
 
+    const pasteInMode = async (
+      value: Mode,
+      editor: Editor,
+      view: MarkdownView
+    ) => {
+      // This follows https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/read#browser_compatibility,
+      // for requesting access to the .read() (vs. .readText())
+      // clipboard method:
+      const originalMode = this.settings.mode;
+      changePasteMode(value);
+      const transfer = new DataTransfer();
+      if (this.clipboardReadWorks) {
+        const clipboardData = await navigator.clipboard.read();
+        for (let i = 0; i < clipboardData.length; i++) {
+          for (const format of clipboardData[i].types) {
+            const typeContents = await (
+              await clipboardData[i].getType(format)
+            ).text();
+            transfer.setData(format, typeContents);
+          }
+        }
+      } else {
+        transfer.setData("text/plain", await navigator.clipboard.readText());
+      }
+      this.app.workspace.trigger(
+        "editor-paste",
+        new ClipboardEvent("paste", {
+          clipboardData: transfer,
+        }),
+        editor,
+        view
+      );
+      changePasteMode(originalMode);
+    };
+
+    Object.values(Mode).forEach((value, index) => {
+      // Passthrough seems not to work with this approach -- perhaps
+      // because event.isTrusted can't be set to true? (I'm unsure.)
+      if (value !== Mode.Passthrough) {
+        if (
+          (value !== Mode.Markdown && value !== Mode.MarkdownBlockquote) ||
+          this.clipboardReadWorks === true
+        ) {
+          const key = Object.keys(Mode)[index];
+
+          this.addCommand({
+            id: `paste-in-mode-${key}`,
+            icon: `pasteIcons-${key}-hourglass`,
+            name: `Paste in ${value} Mode`,
+            editorCallback: async (editor: Editor, view: MarkdownView) => {
+              await pasteInMode(value, editor, view);
+            },
+          });
+        }
+      }
+    });
+
     Object.values(Mode).forEach((value) => {
       this.addCommand({
         id: `cycle-paste-mode`,
+        icon: `pasteIcons-clipboard-cycle`,
         name: `Cycle Paste Mode`,
         callback: async () => {
           const nextMode = (): Mode => {
@@ -238,6 +339,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "toggle-blockquote-at-current-indentation",
       name: "Toggle blockquote at current indentation",
+      icon: "pasteIcons-quote-text",
       checkCallback: (checking: boolean) => {
         let view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
@@ -252,12 +354,37 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addCommand({
       id: "set-paste-mode",
+      icon: "pasteIcons-clipboard-question",
       name: "Set paste mode",
       callback: () => {
         const newMode = new PasteModeModal({
           app,
           onChooseItem,
           currentValue: this.settings.mode,
+          showCurrentValue: true,
+          // This is set to true because clipboard.read()
+          // won't be used directly, so modes don't need to
+          // be filtered as they do elsewhere:
+          clipboardReadWorks: true,
+        });
+        newMode.open();
+      },
+    });
+
+    this.addCommand({
+      id: "paste-in-mode-interactive",
+      icon: "pasteIcons-clipboard-question",
+      name: "Paste in mode (Interactive)",
+      editorCallback: async (editor: Editor, view: MarkdownView) => {
+        const newMode = new PasteModeModal({
+          app,
+          onChooseItem: async (item: number): Promise<void> => {
+            const selection = Object.values(Mode)[item];
+            await pasteInMode(selection, editor, view);
+          },
+          currentValue: null,
+          showCurrentValue: false,
+          clipboardReadWorks: this.clipboardReadWorks,
         });
         newMode.open();
       },
@@ -275,6 +402,8 @@ export default class PastetoIndentationPlugin extends Plugin {
         app,
         onChooseItem,
         currentValue: this.settings.mode,
+        showCurrentValue: true,
+        clipboardReadWorks: this.clipboardReadWorks,
       });
       newMode.open();
     });
@@ -309,6 +438,18 @@ class SettingTab extends PluginSettingTab {
 
     containerEl.createEl("h2", { text: "Paste to Current Indentation" });
 
+    if (!this.plugin.clipboardReadWorks) {
+      const noticeDiv = containerEl.createDiv();
+      noticeDiv
+        .createEl("span", { text: "Notice: " })
+        .addClass("paste-to-current-indentation-settings-notice");
+      noticeDiv
+        .createEl("span", {
+          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" commands have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
+        })
+        .addClass("paste-to-current-indentation-settings-notice-text");
+    }
+
     new Setting(containerEl)
       .setName("Paste Mode")
       .setDesc("Mode that the paste command will invoke.")
@@ -324,7 +465,9 @@ class SettingTab extends PluginSettingTab {
             this.plugin.settings.mode =
               (value as Mode) || DEFAULT_SETTINGS.mode;
             await this.plugin.saveSettings();
-            this.plugin.statusBar.setText(`Paste Mode: ${this.plugin.settings.mode}`);
+            this.plugin.statusBar.setText(
+              `Paste Mode: ${this.plugin.settings.mode}`
+            );
           })
       );
 
