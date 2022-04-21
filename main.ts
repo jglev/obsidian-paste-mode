@@ -32,6 +32,7 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly currentValue: Mode;
   public readonly showCurrentValue: boolean;
   public readonly clipboardReadWorks: boolean;
+  public readonly showPassthroughMode: boolean;
 
   constructor({
     app,
@@ -39,16 +40,19 @@ class PasteModeModal extends FuzzySuggestModal<number> {
     currentValue,
     showCurrentValue,
     clipboardReadWorks,
+    showPassthroughMode,
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
     currentValue: Mode;
     showCurrentValue: boolean;
     clipboardReadWorks: boolean;
+    showPassthroughMode: boolean;
   }) {
     super(app);
 
     this.clipboardReadWorks = clipboardReadWorks;
+    this.showPassthroughMode = showPassthroughMode;
 
     if (showCurrentValue) {
       this.setPlaceholder(`Current: ${currentValue}`);
@@ -76,10 +80,12 @@ class PasteModeModal extends FuzzySuggestModal<number> {
     const filteredModes = Object.keys(Mode)
       .map((key, index) => {
         if (
-          Object.values(Mode)[index] !== Mode.Passthrough &&
-          ((Object.values(Mode)[index] !== Mode.Markdown &&
-            Object.values(Mode)[index] !== Mode.MarkdownBlockquote) ||
-            this.clipboardReadWorks === true)
+          (this.showPassthroughMode &&
+            Object.values(Mode)[index] === Mode.Passthrough) ||
+          (Object.values(Mode)[index] !== Mode.Passthrough &&
+            ((Object.values(Mode)[index] !== Mode.Markdown &&
+              Object.values(Mode)[index] !== Mode.MarkdownBlockquote) ||
+              this.clipboardReadWorks === true))
         ) {
           return index;
         } else {
@@ -366,6 +372,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           // won't be used directly, so modes don't need to
           // be filtered as they do elsewhere:
           clipboardReadWorks: true,
+          showPassthroughMode: true,
         });
         newMode.open();
       },
@@ -385,6 +392,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           currentValue: null,
           showCurrentValue: false,
           clipboardReadWorks: this.clipboardReadWorks,
+          showPassthroughMode: false,
         });
         newMode.open();
       },
@@ -404,6 +412,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         currentValue: this.settings.mode,
         showCurrentValue: true,
         clipboardReadWorks: this.clipboardReadWorks,
+        showPassthroughMode: true,
       });
       newMode.open();
     });
