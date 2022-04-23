@@ -549,7 +549,7 @@ class SettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Save base64-encoded files")
       .setDesc(
-        "When pasting in Markdown or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file."
+        "When pasting in Text, Text (Blockquote), Markdown, or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file."
       )
       .addToggle((toggle) => {
         toggle
