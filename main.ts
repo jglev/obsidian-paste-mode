@@ -1,10 +1,9 @@
 import {
   addIcon,
-  base64ToArrayBuffer,
   App,
+  base64ToArrayBuffer,
   Editor,
   EditorTransaction,
-  FileSystemAdapter,
   FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
@@ -108,13 +107,17 @@ class PasteModeModal extends FuzzySuggestModal<number> {
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
+  saveBase64EncodedFiles: boolean;
+  saveBase64EncodedFilesLocation: string;
   apiVersion: number;
 }
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
-  apiVersion: 2,
+  saveBase64EncodedFiles: false,
+  saveBase64EncodedFilesLocation: "",
+  apiVersion: 3,
 };
 
 for (const [key, value] of Object.entries(pluginIcons)) {
@@ -195,22 +198,36 @@ export default class PastetoIndentationPlugin extends Plugin {
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
-        // TODO: Add settings switch here.
-        if (mode !== Mode.CodeBlock && mode !== Mode.CodeBlockBlockquote) {
+        if (
+          this.settings.saveBase64EncodedFiles &&
+          mode !== Mode.CodeBlock &&
+          mode !== Mode.CodeBlockBlockquote
+        ) {
           const images = [
             ...clipboardContents.matchAll(
               /data:image\/(?<extension>.*?);base64,\s*(?<data>.*)\b/g
             ),
           ];
-          console.log(201, images);
 
           // We reverse images here in order that string
           // changes not affect the accuracy of later images'
           // indexes:
           for (let image of images.reverse()) {
-            const imageFileName = `Pasted image ${moment().format(
-              "YYYYMMDDHHmmss"
-            )}.${image.groups.extension}`;
+            const imageFileName = `${
+              this.settings.saveBase64EncodedFilesLocation || "."
+            }/Pasted image ${moment().format("YYYYMMDDHHmmss")}.${
+              image.groups.extension
+            }`;
+
+            if (
+              !(await app.vault.adapter.exists(
+                this.settings.saveBase64EncodedFilesLocation
+              ))
+            ) {
+              await app.vault.createFolder(
+                this.settings.saveBase64EncodedFilesLocation
+              );
+            }
 
             await app.vault.adapter.writeBinary(
               imageFileName,
@@ -219,12 +236,11 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             clipboardContents =
               clipboardContents.substring(0, image.index) +
-              `./${encodeURI(imageFileName)}` +
+              `${encodeURI(imageFileName)}` +
               clipboardContents.substring(
                 image.index + image[0].length,
                 clipboardContents.length
               );
-            console.log(239, clipboardContents);
           }
         }
 
@@ -515,6 +531,40 @@ class SettingTab extends PluginSettingTab {
             );
           })
       );
+
+    new Setting(containerEl)
+      .setName("Save base64-encoded files")
+      .setDesc(
+        "When pasting in Markdown or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file."
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(
+            this.plugin.settings.saveBase64EncodedFiles ||
+              DEFAULT_SETTINGS.saveBase64EncodedFiles
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.saveBase64EncodedFiles = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("base64-encoded file location")
+      .setDesc(
+        `If "Save base64-encoded files" is enabled, place newly-created files in this folder.`
+      )
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.saveBase64EncodedFilesLocation ||
+              DEFAULT_SETTINGS.saveBase64EncodedFilesLocation
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.saveBase64EncodedFilesLocation = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName("Blockquote Prefix")
