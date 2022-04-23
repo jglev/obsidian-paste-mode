@@ -208,8 +208,8 @@ export default class PastetoIndentationPlugin extends Plugin {
           // changes not affect the accuracy of later images'
           // indexes:
           for (let image of images.reverse()) {
-            const imageFileName = `pasted_image_${moment().format(
-              "YYYY-MM-DD-HH:mm:ss"
+            const imageFileName = `Pasted image ${moment().format(
+              "YYYYMMDDHHmmss"
             )}.${image.groups.extension}`;
 
             await app.vault.adapter.writeBinary(
@@ -219,7 +219,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             clipboardContents =
               clipboardContents.substring(0, image.index) +
-              imageFileName +
+              `./${encodeURI(imageFileName)}` +
               clipboardContents.substring(
                 image.index + image[0].length,
                 clipboardContents.length
