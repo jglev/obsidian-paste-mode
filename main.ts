@@ -213,11 +213,25 @@ export default class PastetoIndentationPlugin extends Plugin {
           // changes not affect the accuracy of later images'
           // indexes:
           for (let image of images.reverse()) {
-            const imageFileName = `${
+            let imageFileName = `${
               this.settings.saveBase64EncodedFilesLocation || "."
             }/Pasted image ${moment().format("YYYYMMDDHHmmss")}.${
               image.groups.extension
             }`;
+
+            // Address race condition whereby if multiple image files exist
+            // on the clipboard, they will all be saved to the same name:
+            let imageFileNameIndex = 0;
+            let imageFileNameWithIndex = imageFileName;
+            while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
+              imageFileNameWithIndex = `${
+                this.settings.saveBase64EncodedFilesLocation || "."
+              }/Pasted image ${moment().format(
+                "YYYYMMDDHHmmss"
+              )}_${imageFileNameIndex}.${image.groups.extension}`;
+              imageFileNameIndex += 1;
+            }
+            imageFileName = imageFileNameWithIndex;
 
             if (
               !(await app.vault.adapter.exists(
