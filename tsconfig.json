@@ -16,7 +16,7 @@
       "dom",
       "es5",
       "scripthost",
-      "es2015",
+      "es2020",
       "ESNext.String"
     ]
   },

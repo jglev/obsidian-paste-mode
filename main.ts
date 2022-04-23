@@ -1,8 +1,10 @@
 import {
   addIcon,
+  base64ToArrayBuffer,
   App,
   Editor,
   EditorTransaction,
+  FileSystemAdapter,
   FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
@@ -14,6 +16,8 @@ import {
 } from "obsidian";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
+
+const moment = require("moment");
 
 import * as pluginIcons from "./icons.json";
 
@@ -161,9 +165,8 @@ export default class PastetoIndentationPlugin extends Plugin {
         let output = "";
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          clipboardContents = htmlToMarkdown(
-            evt.clipboardData.getData("text/html")
-          );
+          const clipboardHtml = evt.clipboardData.getData("text/html");
+          clipboardContents = htmlToMarkdown(clipboardHtml);
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
           // we will switch to the equivalent Text mode:
@@ -191,6 +194,39 @@ export default class PastetoIndentationPlugin extends Plugin {
           .match(new RegExp(`^(\\s*)`));
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
+
+        // TODO: Add settings switch here.
+        if (mode !== Mode.CodeBlock && mode !== Mode.CodeBlockBlockquote) {
+          const images = [
+            ...clipboardContents.matchAll(
+              /data:image\/(?<extension>.*?);base64,\s*(?<data>.*)\b/g
+            ),
+          ];
+          console.log(201, images);
+
+          // We reverse images here in order that string
+          // changes not affect the accuracy of later images'
+          // indexes:
+          for (let image of images.reverse()) {
+            const imageFileName = `pasted_image_${moment().format(
+              "YYYY-MM-DD-HH:mm:ss"
+            )}.${image.groups.extension}`;
+
+            await app.vault.adapter.writeBinary(
+              imageFileName,
+              base64ToArrayBuffer(image.groups.data)
+            );
+
+            clipboardContents =
+              clipboardContents.substring(0, image.index) +
+              imageFileName +
+              clipboardContents.substring(
+                image.index + image[0].length,
+                clipboardContents.length
+              );
+            console.log(239, clipboardContents);
+          }
+        }
 
         let input = clipboardContents.split("\n").map((line, i) => {
           if (i === 0) {
