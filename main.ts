@@ -499,7 +499,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "paste-in-mode-interactive",
       icon: "pasteIcons-clipboard-question",
-      name: "Paste in mode (Interactive)",
+      name: "Paste in Mode (Interactive)",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const newMode = new PasteModeModal({
           app,
