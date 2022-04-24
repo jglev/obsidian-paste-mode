@@ -11,7 +11,6 @@ import {
   Platform,
   Plugin,
   PluginSettingTab,
-  TFile,
   Setting,
 } from "obsidian";
 
@@ -616,7 +615,7 @@ class SettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("base64-encoded file location")
+      .setName("Attachment folder path")
       .setDesc(
         `When saving files from the clipboard, place them in this folder.`
       )
