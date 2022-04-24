@@ -11,6 +11,7 @@ import {
   Platform,
   Plugin,
   PluginSettingTab,
+  TFile,
   Setting,
 } from "obsidian";
 
@@ -29,6 +30,31 @@ enum Mode {
   CodeBlockBlockquote = "Code Block (Blockquote)",
   Passthrough = "Passthrough",
 }
+
+const createImageFileName = async (
+  fileLocation: string,
+  extension: string
+): Promise<string> => {
+  let imageFileName = `${fileLocation || "."}/Pasted image ${moment().format(
+    "YYYYMMDDHHmmss"
+  )}.${extension}`;
+
+  // Address race condition whereby if multiple image files exist
+  // on the clipboard, they will all be saved to the same name:
+  let imageFileNameIndex = 0;
+  let imageFileNameWithIndex = imageFileName;
+  while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
+    imageFileNameWithIndex = `${
+      fileLocation || "."
+    }/Pasted image ${moment().format(
+      "YYYYMMDDHHmmss"
+    )}_${imageFileNameIndex}.${extension}`;
+    imageFileNameIndex += 1;
+  }
+  imageFileName = imageFileNameWithIndex;
+
+  return imageFileName;
+};
 
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
@@ -108,7 +134,7 @@ interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
   saveBase64EncodedFiles: boolean;
-  saveBase64EncodedFilesLocation: string;
+  saveFilesLocation: string;
   apiVersion: number;
 }
 
@@ -116,7 +142,7 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
   saveBase64EncodedFiles: false,
-  saveBase64EncodedFilesLocation: "",
+  saveFilesLocation: "",
   apiVersion: 3,
 };
 
@@ -152,9 +178,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.defaultPrevented) {
           return;
         }
-        if (evt.clipboardData.types.every((type) => type === "files")) {
-          return;
-        }
 
         let mode = this.settings.mode;
 
@@ -166,6 +189,49 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         let clipboardContents = "";
         let output = "";
+
+        // TODO: Add setting here.
+        // if (evt.clipboardData.types.every((type) => type === "files")) {
+        //   return;
+        // }
+        const files = evt.clipboardData.files;
+        const fileLinks = [];
+        if (files.length) {
+          if (
+            !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
+          ) {
+            await app.vault.createFolder(this.settings.saveFilesLocation);
+          }
+        }
+
+        for (var i = 0; i < files.length; i++) {
+          const fileObject = files[i];
+
+          const fileName = await createImageFileName(
+            this.settings.saveFilesLocation,
+            fileObject.type.split("/")[1]
+          );
+
+          await app.vault.adapter.writeBinary(
+            fileName,
+            await fileObject.arrayBuffer()
+          );
+
+          const tfileObject = this.app.vault.getFiles().filter((f) => {
+            return f.path === fileName;
+          })[0];
+
+          if (tfileObject === undefined) {
+            continue;
+          }
+
+          const link = this.app.fileManager.generateMarkdownLink(
+            tfileObject,
+            this.app.workspace.getActiveFile().path
+          );
+
+          fileLinks.push(link);
+        }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
           const clipboardHtml = evt.clipboardData.getData("text/html");
@@ -213,34 +279,15 @@ export default class PastetoIndentationPlugin extends Plugin {
           // changes not affect the accuracy of later images'
           // indexes:
           for (let image of images.reverse()) {
-            let imageFileName = `${
-              this.settings.saveBase64EncodedFilesLocation || "."
-            }/Pasted image ${moment().format("YYYYMMDDHHmmss")}.${
+            const imageFileName = await createImageFileName(
+              this.settings.saveFilesLocation,
               image.groups.extension
-            }`;
-
-            // Address race condition whereby if multiple image files exist
-            // on the clipboard, they will all be saved to the same name:
-            let imageFileNameIndex = 0;
-            let imageFileNameWithIndex = imageFileName;
-            while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
-              imageFileNameWithIndex = `${
-                this.settings.saveBase64EncodedFilesLocation || "."
-              }/Pasted image ${moment().format(
-                "YYYYMMDDHHmmss"
-              )}_${imageFileNameIndex}.${image.groups.extension}`;
-              imageFileNameIndex += 1;
-            }
-            imageFileName = imageFileNameWithIndex;
+            );
 
             if (
-              !(await app.vault.adapter.exists(
-                this.settings.saveBase64EncodedFilesLocation
-              ))
+              !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
             ) {
-              await app.vault.createFolder(
-                this.settings.saveBase64EncodedFilesLocation
-              );
+              await app.vault.createFolder(this.settings.saveFilesLocation);
             }
 
             await app.vault.adapter.writeBinary(
@@ -258,7 +305,12 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
         }
 
-        let input = clipboardContents.split("\n").map((line, i) => {
+        let input = [
+          ...(clipboardContents.split("\n").join("") !== ""
+            ? clipboardContents.split("\n")
+            : []),
+          ...fileLinks,
+        ].map((line, i) => {
           if (i === 0) {
             return line;
           }
@@ -266,7 +318,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         });
 
         if (mode === Mode.Text || mode === Mode.Markdown) {
-          output = input.join("\n");
+          output = output + input.join("\n");
         }
 
         if (mode === Mode.CodeBlock) {
@@ -566,16 +618,16 @@ class SettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("base64-encoded file location")
       .setDesc(
-        `If "Save base64-encoded files" is enabled, place newly-created files in this folder.`
+        `When saving files from the clipboard, place them in this folder.`
       )
       .addText((text) => {
         text
           .setValue(
-            this.plugin.settings.saveBase64EncodedFilesLocation ||
-              DEFAULT_SETTINGS.saveBase64EncodedFilesLocation
+            this.plugin.settings.saveFilesLocation ||
+              DEFAULT_SETTINGS.saveFilesLocation
           )
           .onChange(async (value) => {
-            this.plugin.settings.saveBase64EncodedFilesLocation = value;
+            this.plugin.settings.saveFilesLocation = value;
             await this.plugin.saveSettings();
           });
       });
