@@ -1,7 +1,5 @@
 ## Obsidian Paste to Current Indentation Plugin
 
-_Note: Version 2.0.0+ is a rewrite of significant portions of this plugin and the way it works. If you were previously using a lower version, please be aware that Version 2 introduces the concept of "Paste Modes," explained below; and that it deprecates several Command Palette commands._
-
 An [Obsidian](https://obsidian.md/) plugin to paste and manage text, including block quotes, that are indented. This plugin helps especially with embedding code, quotes, and other content within lists.
 
 ### "Paste modes"
@@ -32,6 +30,12 @@ There are multiple ways to switch paste modes:
   - These commands could be used, e.g., with the Obsidian [Quick Add plugin](https://github.com/chhoumann/quickadd/blob/master/docs/Choices/MacroChoice.md) to assign a keyboard command for switching to a given mode and then pasting.
 1. Open the Command Palette and search for `Paste to Current Indentation: Cycle Paste Mode`. This command will cycle through the different paste modes (i.e., from Text mode to Text Blockquote mode, to Markdown mode, to Markdown Blockquote mode, to Passthrough mode, back to Text mode, etc.)
 1. Within the plugin's Settings page.
+
+### Limitations of Paste Modes
+
+- The "Markdown" and "Markdown (Blockquote)" modes are automatically disabled **for one-time commands** (i.e., for the "Paste in Markdown Mode," "Paste in Markdown (Blockquote) Mode", and "Paste in Mode (Interactive)" commands) in Obsidian Mobile. This is due to how Obsidian Mobile is allowed to interact with the clipboard.  
+   If these commands are disabled, a note stating such will appear in the Settings tab for the plugin.
+- Similarly, in Obsidian Mobile, images such as screenshots, and similar files, cannot be pasted from the clipboard, due to how Obsidian Mobile is allowed to interact with the clipboard.
 
 ### Additional commands
 

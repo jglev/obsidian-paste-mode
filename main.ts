@@ -1,6 +1,7 @@
 import {
   addIcon,
   App,
+  base64ToArrayBuffer,
   Editor,
   EditorTransaction,
   FuzzySuggestModal,
@@ -10,10 +11,13 @@ import {
   Platform,
   Plugin,
   PluginSettingTab,
+  TFile,
   Setting,
 } from "obsidian";
 
 import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
+
+const moment = require("moment");
 
 import * as pluginIcons from "./icons.json";
 
@@ -26,6 +30,31 @@ enum Mode {
   CodeBlockBlockquote = "Code Block (Blockquote)",
   Passthrough = "Passthrough",
 }
+
+const createImageFileName = async (
+  fileLocation: string,
+  extension: string
+): Promise<string> => {
+  let imageFileName = `${fileLocation || "."}/Pasted image ${moment().format(
+    "YYYYMMDDHHmmss"
+  )}.${extension}`;
+
+  // Address race condition whereby if multiple image files exist
+  // on the clipboard, they will all be saved to the same name:
+  let imageFileNameIndex = 0;
+  let imageFileNameWithIndex = imageFileName;
+  while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
+    imageFileNameWithIndex = `${
+      fileLocation || "."
+    }/Pasted image ${moment().format(
+      "YYYYMMDDHHmmss"
+    )}_${imageFileNameIndex}.${extension}`;
+    imageFileNameIndex += 1;
+  }
+  imageFileName = imageFileNameWithIndex;
+
+  return imageFileName;
+};
 
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
@@ -104,13 +133,17 @@ class PasteModeModal extends FuzzySuggestModal<number> {
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
+  saveBase64EncodedFiles: boolean;
+  saveFilesLocation: string;
   apiVersion: number;
 }
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
-  apiVersion: 2,
+  saveBase64EncodedFiles: false,
+  saveFilesLocation: "",
+  apiVersion: 3,
 };
 
 for (const [key, value] of Object.entries(pluginIcons)) {
@@ -145,9 +178,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.defaultPrevented) {
           return;
         }
-        if (evt.clipboardData.types.every((type) => type === "files")) {
-          return;
-        }
 
         let mode = this.settings.mode;
 
@@ -160,10 +190,52 @@ export default class PastetoIndentationPlugin extends Plugin {
         let clipboardContents = "";
         let output = "";
 
-        if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          clipboardContents = htmlToMarkdown(
-            evt.clipboardData.getData("text/html")
+        // TODO: Add setting here.
+        // if (evt.clipboardData.types.every((type) => type === "files")) {
+        //   return;
+        // }
+        const files = evt.clipboardData.files;
+        const fileLinks = [];
+        if (files.length) {
+          if (
+            !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
+          ) {
+            await app.vault.createFolder(this.settings.saveFilesLocation);
+          }
+        }
+
+        for (var i = 0; i < files.length; i++) {
+          const fileObject = files[i];
+
+          const fileName = await createImageFileName(
+            this.settings.saveFilesLocation,
+            fileObject.type.split("/")[1]
           );
+
+          await app.vault.adapter.writeBinary(
+            fileName,
+            await fileObject.arrayBuffer()
+          );
+
+          const tfileObject = this.app.vault.getFiles().filter((f) => {
+            return f.path === fileName;
+          })[0];
+
+          if (tfileObject === undefined) {
+            continue;
+          }
+
+          const link = this.app.fileManager.generateMarkdownLink(
+            tfileObject,
+            this.app.workspace.getActiveFile().path
+          );
+
+          fileLinks.push(link);
+        }
+
+        if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+          const clipboardHtml = evt.clipboardData.getData("text/html");
+          clipboardContents = htmlToMarkdown(clipboardHtml);
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
           // we will switch to the equivalent Text mode:
@@ -192,7 +264,53 @@ export default class PastetoIndentationPlugin extends Plugin {
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
-        let input = clipboardContents.split("\n").map((line, i) => {
+        if (
+          this.settings.saveBase64EncodedFiles &&
+          mode !== Mode.CodeBlock &&
+          mode !== Mode.CodeBlockBlockquote
+        ) {
+          const images = [
+            ...clipboardContents.matchAll(
+              /data:image\/(?<extension>.*?);base64,\s*(?<data>.*)\b/g
+            ),
+          ];
+
+          // We reverse images here in order that string
+          // changes not affect the accuracy of later images'
+          // indexes:
+          for (let image of images.reverse()) {
+            const imageFileName = await createImageFileName(
+              this.settings.saveFilesLocation,
+              image.groups.extension
+            );
+
+            if (
+              !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
+            ) {
+              await app.vault.createFolder(this.settings.saveFilesLocation);
+            }
+
+            await app.vault.adapter.writeBinary(
+              imageFileName,
+              base64ToArrayBuffer(image.groups.data)
+            );
+
+            clipboardContents =
+              clipboardContents.substring(0, image.index) +
+              `${encodeURI(imageFileName)}` +
+              clipboardContents.substring(
+                image.index + image[0].length,
+                clipboardContents.length
+              );
+          }
+        }
+
+        let input = [
+          ...(clipboardContents.split("\n").join("") !== ""
+            ? clipboardContents.split("\n")
+            : []),
+          ...fileLinks,
+        ].map((line, i) => {
           if (i === 0) {
             return line;
           }
@@ -200,7 +318,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         });
 
         if (mode === Mode.Text || mode === Mode.Markdown) {
-          output = input.join("\n");
+          output = output + input.join("\n");
         }
 
         if (mode === Mode.CodeBlock) {
@@ -381,7 +499,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "paste-in-mode-interactive",
       icon: "pasteIcons-clipboard-question",
-      name: "Paste in mode (Interactive)",
+      name: "Paste in Mode (Interactive)",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const newMode = new PasteModeModal({
           app,
@@ -479,6 +597,40 @@ class SettingTab extends PluginSettingTab {
             );
           })
       );
+
+    new Setting(containerEl)
+      .setName("Save base64-encoded files")
+      .setDesc(
+        "When pasting in Text, Text (Blockquote), Markdown, or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file."
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(
+            this.plugin.settings.saveBase64EncodedFiles ||
+              DEFAULT_SETTINGS.saveBase64EncodedFiles
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.saveBase64EncodedFiles = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("base64-encoded file location")
+      .setDesc(
+        `When saving files from the clipboard, place them in this folder.`
+      )
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.saveFilesLocation ||
+              DEFAULT_SETTINGS.saveFilesLocation
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.saveFilesLocation = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName("Blockquote Prefix")
