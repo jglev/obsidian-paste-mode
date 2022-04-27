@@ -270,7 +270,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         ) {
           const images = [
             ...clipboardContents.matchAll(
-              /data:image\/(?<extension>.*?);base64,\s*(?<data>.*)\b/g
+              /data:image\/(?<extension>.*?);base64,\s*(?<data>[A-Za-z0-9\+\/]*)\b={0,2}/g
             ),
           ];
 
