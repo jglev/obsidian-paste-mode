@@ -14,7 +14,11 @@ import {
   Setting,
 } from "obsidian";
 
-import { toggleQuote, toggleQuoteInEditor } from "./src/toggle-quote";
+import {
+  escapeRegExp,
+  toggleQuote,
+  toggleQuoteInEditor,
+} from "./src/toggle-quote";
 
 const moment = require("moment");
 
@@ -135,6 +139,7 @@ interface PastetoIndentationPluginSettings {
   saveBase64EncodedFiles: boolean;
   saveFilesLocation: string;
   apiVersion: number;
+  escapeCharactersInBlockquotes: boolean;
 }
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
@@ -142,8 +147,11 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   mode: Mode.Markdown,
   saveBase64EncodedFiles: false,
   saveFilesLocation: "",
-  apiVersion: 3,
+  apiVersion: 4,
+  escapeCharactersInBlockquotes: false,
 };
+
+const blockquoteCharactersToEscape = "<";
 
 for (const [key, value] of Object.entries(pluginIcons)) {
   addIcon(key, value);
@@ -350,7 +358,34 @@ export default class PastetoIndentationPlugin extends Plugin {
             new RegExp(`^${leadingWhitespace}`),
             ""
           );
+
           output = toggledText.lines.join("\n");
+
+          if (this.settings.escapeCharactersInBlockquotes) {
+            const charactersToEscape = [
+              ...output.matchAll(
+                new RegExp(
+                  `[${escapeRegExp(blockquoteCharactersToEscape)}]`,
+                  "g"
+                )
+              ),
+            ]
+              .map((x) => x.index)
+              .reverse();
+
+            charactersToEscape.forEach((index) => {
+              if (
+                output[Number(index) - 1] !== "\\" &&
+                !(
+                  output[Number(index) - 1] === "\\" &&
+                  output[Number(index) - 2] === "\\"
+                )
+              ) {
+                output =
+                  output.substring(0, index) + "\\" + output.substring(index);
+              }
+            });
+          }
         }
 
         const transaction: EditorTransaction = {
@@ -651,5 +686,22 @@ class SettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Escape characters in blockquotes")
+      .setDesc(
+        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of "${blockquoteCharactersToEscape}" characters.`
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(
+            this.plugin.settings.escapeCharactersInBlockquotes ||
+              DEFAULT_SETTINGS.escapeCharactersInBlockquotes
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.escapeCharactersInBlockquotes = value;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }

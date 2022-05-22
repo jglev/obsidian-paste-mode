@@ -4,10 +4,10 @@ import { MarkdownView } from 'obsidian';
 // which, as a code snippet, is in the public domain, per 
 // https://developer.mozilla.org/en-US/docs/MDN/About#copyrights_and_licenses
 // (as of 2021-07-15):
-function escapeRegExp(string: string) {
+export const escapeRegExp = (string: string) => {
   // $& means the whole matched string:
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 
 export const toggleQuote = async (
   linesInput: string[],
