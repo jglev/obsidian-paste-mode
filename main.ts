@@ -26,14 +26,6 @@ const moment = require("moment");
 
 import * as pluginIcons from "./icons.json";
 
-const moveInArray = (arr: any[], from: number, to: number) => {
-  const arrClone = cloneDeep(arr);
-  const item = arrClone[from];
-  arrClone.splice(from, 1);
-  arrClone.splice(to, 0, item);
-  return arrClone;
-};
-
 enum Mode {
   Text = "Text",
   TextBlockquote = "Text (Blockquote)",
@@ -152,8 +144,8 @@ interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
   saveBase64EncodedFiles: boolean;
-  saveFilesLocation?: string; // Deprecated as of apiVersion 5
-  saveFilesLocations: AttachmentLocation[];
+  saveFilesLocation: string;
+  saveFilesOverrideLocations: AttachmentLocation[];
   apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
 }
@@ -162,7 +154,8 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
   saveBase64EncodedFiles: false,
-  saveFilesLocations: [],
+  saveFilesLocation: "Attachments",
+  saveFilesOverrideLocations: [],
   apiVersion: 5,
   escapeCharactersInBlockquotes: false,
 };
@@ -219,11 +212,24 @@ export default class PastetoIndentationPlugin extends Plugin {
         // }
         const files = evt.clipboardData.files;
         const fileLinks = [];
-        if (files.length) {
+        const activeFile = this.app.workspace.getActiveFile();
+
+        let filesTargetLocation = this.settings.saveFilesLocation;
+        let longestMatchingCursorFilePattern = 0;
+        this.settings.saveFilesOverrideLocations.forEach((location) => {
           if (
-            !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
+            activeFile.path.startsWith(location.cursorFilePattern) &&
+            location.cursorFilePattern.length > longestMatchingCursorFilePattern
           ) {
-            await app.vault.createFolder(this.settings.saveFilesLocation);
+            filesTargetLocation = location.targetLocation;
+            longestMatchingCursorFilePattern =
+              location.cursorFilePattern.length;
+          }
+        });
+
+        if (files.length) {
+          if (!(await app.vault.adapter.exists(filesTargetLocation))) {
+            await app.vault.createFolder(filesTargetLocation);
           }
         }
 
@@ -231,7 +237,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           const fileObject = files[i];
 
           const fileName = await createImageFileName(
-            this.settings.saveFilesLocation,
+            filesTargetLocation,
             fileObject.type.split("/")[1]
           );
 
@@ -310,14 +316,12 @@ export default class PastetoIndentationPlugin extends Plugin {
           // indexes:
           for (let image of images.reverse()) {
             const imageFileName = await createImageFileName(
-              this.settings.saveFilesLocation,
+              filesTargetLocation,
               image.groups.extension
             );
 
-            if (
-              !(await app.vault.adapter.exists(this.settings.saveFilesLocation))
-            ) {
-              await app.vault.createFolder(this.settings.saveFilesLocation);
+            if (!(await app.vault.adapter.exists(filesTargetLocation))) {
+              await app.vault.createFolder(filesTargetLocation);
             }
 
             await app.vault.adapter.writeBinary(
@@ -597,20 +601,6 @@ export default class PastetoIndentationPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
-    if (this.settings.apiVersion < 5) {
-      console.log("Updating settings to apiVersion 5...");
-
-      if (this.settings?.saveFilesLocation) {
-        this.settings.saveFilesLocations.push({
-          cursorFilePattern: "",
-          targetLocation: this.settings.saveFilesLocation,
-        });
-      }
-
-      this.settings.apiVersion = 5;
-      this.saveSettings();
-    }
-
     if (!Object.values(Mode).includes(this.settings.mode)) {
       this.settings.mode = Object.values(Mode)[0];
       this.saveSettings();
@@ -644,7 +634,7 @@ class SettingTab extends PluginSettingTab {
         .addClass("paste-to-current-indentation-settings-notice");
       noticeDiv
         .createEl("span", {
-          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
+          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentOverrideLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
         })
         .addClass("paste-to-current-indentation-settings-notice-text");
     }
@@ -688,7 +678,7 @@ class SettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName("Attachment folder path")
+      .setName("Default attachment folder path")
       .setDesc(
         `When saving files from the clipboard, place them in this folder.`
       )
@@ -704,91 +694,68 @@ class SettingTab extends PluginSettingTab {
           });
       });
 
-    const fragment = document.createDocumentFragment();
-    const attachmentLocationsEl = containerEl.createEl("div");
-    attachmentLocationsEl.addClass("attachmentLocations");
-    attachmentLocationsEl.createEl("h2", { text: "attachmentLocations" });
-    const attachmentLocationsDescriptionEl =
-      attachmentLocationsEl.createEl("div");
-    attachmentLocationsDescriptionEl.addClass("setting-item-description");
-    attachmentLocationsDescriptionEl.append(
-      "attachmentLocations for the attachmentLocation palette. ",
-      fragment.createEl("span", {
-        text: "Changes to this section are not reflected outside of this settings window until Obsidian is reloaded.",
-        cls: "bold",
-      }),
-      fragment.createEl("br"),
-      " Each attachmentLocation is populated by filtering the Pattern names above. Untitled patterns are given placeholder names of the form ",
-      '."',
-      fragment.createEl("br"),
-      "If a attachmentLocation matches only one Pattern, it will automatically run that Pattern when the attachmentLocation is called. If the attachmentLocation matches more than one Pattern, a submenu will open, asking which Pattern you would like to run."
-    );
+    const attachmentOverrideLocationsEl = containerEl.createEl("div");
+    attachmentOverrideLocationsEl.addClass("attachment-locations");
+    attachmentOverrideLocationsEl.createEl("h3", {
+      text: "Attachment Overrides",
+    });
 
-    const attachmentLocations = this.plugin.settings.saveFilesLocations;
+    const attachmentOverrideLocations =
+      this.plugin.settings.saveFilesOverrideLocations;
     for (const [
       attachmentLocationIndex,
       attachmentLocation,
-    ] of attachmentLocations.entries()) {
-      const settings = this.plugin.settings;
-
-      const attachmentLocationEl = attachmentLocationsEl.createEl("div");
+    ] of attachmentOverrideLocations.entries()) {
+      const attachmentLocationEl =
+        attachmentOverrideLocationsEl.createEl("div");
       attachmentLocationEl.addClass("attachmentLocation");
 
-      attachmentLocationEl.createEl("h3", {
-        text: `attachmentLocation ${attachmentLocationIndex + 1}`,
-      });
-
-      let deleteattachmentLocationPrimed = false;
+      let deleteAttachmentLocationPrimed = false;
       let attachmentLocationDeletePrimerTimer: ReturnType<
         typeof setTimeout
       > | null;
 
       new Setting(attachmentLocationEl)
-        .setName("attachmentLocation meta controls")
-        .addExtraButton((button) => {
-          button
-            .setIcon("up-chevron-glyph")
-            .setTooltip("Move attachment location up")
-            .setDisabled(attachmentLocationIndex === 0)
-            .onClick(async () => {
-              this.plugin.settings.saveFilesLocations = moveInArray(
-                this.plugin.settings.saveFilesLocations,
-                attachmentLocationIndex,
-                attachmentLocationIndex - 1
-              );
-
+        .setName("Current file directory")
+        .setDesc("If the current file is in this directory...")
+        .addText((text) => {
+          text
+            .setValue(attachmentLocation.cursorFilePattern)
+            .onChange(async (value) => {
+              this.plugin.settings.saveFilesOverrideLocations[
+                attachmentLocationIndex
+              ].cursorFilePattern = value;
               await this.plugin.saveSettings();
-              this.display();
             });
-        })
-        .addExtraButton((button) => {
-          button
-            .setIcon("down-chevron-glyph")
-            .setTooltip("Move attachment location down")
-            .setDisabled(
-              attachmentLocationIndex === attachmentLocations.length - 1
-            )
-            .onClick(async () => {
-              this.plugin.settings.saveFilesLocations = moveInArray(
-                this.plugin.settings.saveFilesLocations,
-                attachmentLocationIndex,
-                attachmentLocationIndex + 1
-              );
+        });
 
+      new Setting(attachmentLocationEl)
+        .setName("Saved file target location")
+        .setDesc("...Save a pasted file into this directory:")
+        .addText((text) => {
+          text
+            .setValue(attachmentLocation.targetLocation)
+            .onChange(async (value) => {
+              this.plugin.settings.saveFilesOverrideLocations[
+                attachmentLocationIndex
+              ].targetLocation = value;
               await this.plugin.saveSettings();
-              this.display();
             });
-        })
-        .addExtraButton((button) => {
+        });
+
+      new Setting(attachmentLocationEl)
+        .setName("Delete location rule")
+        .addButton((button) => {
           button
-            .setIcon("cross-in-box")
-            .setTooltip("Delete attachment location")
+            .setButtonText("Delete")
+            .setClass("paste-to-current-indentation-settings-delete-button")
+            .setTooltip("Delete override location")
             .onClick(async () => {
               if (attachmentLocationDeletePrimerTimer) {
                 clearTimeout(attachmentLocationDeletePrimerTimer);
               }
-              if (deleteattachmentLocationPrimed === true) {
-                this.plugin.settings.saveFilesLocations.splice(
+              if (deleteAttachmentLocationPrimed === true) {
+                this.plugin.settings.saveFilesOverrideLocations.splice(
                   attachmentLocationIndex,
                   1
                 );
@@ -800,12 +767,12 @@ class SettingTab extends PluginSettingTab {
 
               attachmentLocationDeletePrimerTimer = setTimeout(
                 () => {
-                  deleteattachmentLocationPrimed = false;
+                  deleteAttachmentLocationPrimed = false;
                   attachmentLocationEl.removeClass("primed");
                 },
                 1000 * 4 // 4 second timeout
               );
-              deleteattachmentLocationPrimed = true;
+              deleteAttachmentLocationPrimed = true;
               attachmentLocationEl.addClass("primed");
 
               new Notice(
@@ -815,26 +782,19 @@ class SettingTab extends PluginSettingTab {
               );
             });
         });
-
-      new Setting(attachmentLocationEl)
-        .setName("One")
-        .setDesc("One.")
-        .addSearch((search) => {});
     }
 
-    const addattachmentLocationButtonEl = attachmentLocationsEl.createEl(
-      "div",
-      {
+    const addattachmentLocationButtonEl =
+      attachmentOverrideLocationsEl.createEl("div", {
         cls: "add-attachmentLocation-button-el",
-      }
-    );
+      });
 
     new Setting(addattachmentLocationButtonEl).addButton((button) => {
       button
-        .setButtonText("Add attachment location")
+        .setButtonText("Add attachment override location")
         .setClass("add-attachmentLocation-button")
         .onClick(async () => {
-          this.plugin.settings.saveFilesLocations.push({
+          this.plugin.settings.saveFilesOverrideLocations.push({
             cursorFilePattern: "",
             targetLocation: "",
           });

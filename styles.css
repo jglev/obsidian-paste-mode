@@ -6,3 +6,7 @@
 .paste-to-current-indentation-settings-notice-text {
   font-style: italic;
 }
+.primed .paste-to-current-indentation-settings-delete-button {
+  background: var(--text-error) !important;
+  color: white !important;
+}
