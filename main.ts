@@ -267,9 +267,16 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         const leadingWhitespaceMatch = editor
           .getLine(editor.getCursor().line)
-          .match(new RegExp(`^(\\s*)`));
+          .match(new RegExp(`^(\\s*)([-\\*]\\s)?`));
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
+
+        // The length of `- ` / `* `, to accomodate a bullet list:
+        const additionalLeadingWhitespace =
+          leadingWhitespaceMatch !== null &&
+          leadingWhitespaceMatch[2] !== undefined
+            ? "  "
+            : "";
 
         if (
           this.settings.saveBase64EncodedFiles &&
@@ -321,7 +328,8 @@ export default class PastetoIndentationPlugin extends Plugin {
           if (i === 0) {
             return line;
           }
-          return leadingWhitespace + line;
+
+          return leadingWhitespace + additionalLeadingWhitespace + line;
         });
 
         if (mode === Mode.Text || mode === Mode.Markdown) {
