@@ -1,5 +1,7 @@
+import cloneDeep from "lodash.clonedeep";
 import {
   addIcon,
+  apiVersion,
   App,
   base64ToArrayBuffer,
   Editor,
@@ -23,6 +25,14 @@ import {
 const moment = require("moment");
 
 import * as pluginIcons from "./icons.json";
+
+const moveInArray = (arr: any[], from: number, to: number) => {
+  const arrClone = cloneDeep(arr);
+  const item = arrClone[from];
+  arrClone.splice(from, 1);
+  arrClone.splice(to, 0, item);
+  return arrClone;
+};
 
 enum Mode {
   Text = "Text",
@@ -133,11 +143,17 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 }
 
+export interface AttachmentLocation {
+  cursorFilePattern: string;
+  targetLocation: string;
+}
+
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
   saveBase64EncodedFiles: boolean;
-  saveFilesLocation: string;
+  saveFilesLocation?: string; // Deprecated as of apiVersion 5
+  saveFilesLocations: AttachmentLocation[];
   apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
 }
@@ -146,8 +162,8 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
   saveBase64EncodedFiles: false,
-  saveFilesLocation: "",
-  apiVersion: 4,
+  saveFilesLocations: [],
+  apiVersion: 5,
   escapeCharactersInBlockquotes: false,
 };
 
@@ -581,6 +597,20 @@ export default class PastetoIndentationPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
+    if (this.settings.apiVersion < 5) {
+      console.log("Updating settings to apiVersion 5...");
+
+      if (this.settings?.saveFilesLocation) {
+        this.settings.saveFilesLocations.push({
+          cursorFilePattern: "",
+          targetLocation: this.settings.saveFilesLocation,
+        });
+      }
+
+      this.settings.apiVersion = 5;
+      this.saveSettings();
+    }
+
     if (!Object.values(Mode).includes(this.settings.mode)) {
       this.settings.mode = Object.values(Mode)[0];
       this.saveSettings();
@@ -614,14 +644,14 @@ class SettingTab extends PluginSettingTab {
         .addClass("paste-to-current-indentation-settings-notice");
       noticeDiv
         .createEl("span", {
-          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" commands have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
+          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
         })
         .addClass("paste-to-current-indentation-settings-notice-text");
     }
 
     new Setting(containerEl)
       .setName("Paste Mode")
-      .setDesc("Mode that the paste command will invoke.")
+      .setDesc("Mode that the paste attachmentLocation will invoke.")
       .addDropdown((dropdown) =>
         dropdown
           .addOption(Mode.Text, "Plain Text")
@@ -673,6 +703,145 @@ class SettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
+
+    const fragment = document.createDocumentFragment();
+    const attachmentLocationsEl = containerEl.createEl("div");
+    attachmentLocationsEl.addClass("attachmentLocations");
+    attachmentLocationsEl.createEl("h2", { text: "attachmentLocations" });
+    const attachmentLocationsDescriptionEl =
+      attachmentLocationsEl.createEl("div");
+    attachmentLocationsDescriptionEl.addClass("setting-item-description");
+    attachmentLocationsDescriptionEl.append(
+      "attachmentLocations for the attachmentLocation palette. ",
+      fragment.createEl("span", {
+        text: "Changes to this section are not reflected outside of this settings window until Obsidian is reloaded.",
+        cls: "bold",
+      }),
+      fragment.createEl("br"),
+      " Each attachmentLocation is populated by filtering the Pattern names above. Untitled patterns are given placeholder names of the form ",
+      '."',
+      fragment.createEl("br"),
+      "If a attachmentLocation matches only one Pattern, it will automatically run that Pattern when the attachmentLocation is called. If the attachmentLocation matches more than one Pattern, a submenu will open, asking which Pattern you would like to run."
+    );
+
+    const attachmentLocations = this.plugin.settings.saveFilesLocations;
+    for (const [
+      attachmentLocationIndex,
+      attachmentLocation,
+    ] of attachmentLocations.entries()) {
+      const settings = this.plugin.settings;
+
+      const attachmentLocationEl = attachmentLocationsEl.createEl("div");
+      attachmentLocationEl.addClass("attachmentLocation");
+
+      attachmentLocationEl.createEl("h3", {
+        text: `attachmentLocation ${attachmentLocationIndex + 1}`,
+      });
+
+      let deleteattachmentLocationPrimed = false;
+      let attachmentLocationDeletePrimerTimer: ReturnType<
+        typeof setTimeout
+      > | null;
+
+      new Setting(attachmentLocationEl)
+        .setName("attachmentLocation meta controls")
+        .addExtraButton((button) => {
+          button
+            .setIcon("up-chevron-glyph")
+            .setTooltip("Move attachment location up")
+            .setDisabled(attachmentLocationIndex === 0)
+            .onClick(async () => {
+              this.plugin.settings.saveFilesLocations = moveInArray(
+                this.plugin.settings.saveFilesLocations,
+                attachmentLocationIndex,
+                attachmentLocationIndex - 1
+              );
+
+              await this.plugin.saveSettings();
+              this.display();
+            });
+        })
+        .addExtraButton((button) => {
+          button
+            .setIcon("down-chevron-glyph")
+            .setTooltip("Move attachment location down")
+            .setDisabled(
+              attachmentLocationIndex === attachmentLocations.length - 1
+            )
+            .onClick(async () => {
+              this.plugin.settings.saveFilesLocations = moveInArray(
+                this.plugin.settings.saveFilesLocations,
+                attachmentLocationIndex,
+                attachmentLocationIndex + 1
+              );
+
+              await this.plugin.saveSettings();
+              this.display();
+            });
+        })
+        .addExtraButton((button) => {
+          button
+            .setIcon("cross-in-box")
+            .setTooltip("Delete attachment location")
+            .onClick(async () => {
+              if (attachmentLocationDeletePrimerTimer) {
+                clearTimeout(attachmentLocationDeletePrimerTimer);
+              }
+              if (deleteattachmentLocationPrimed === true) {
+                this.plugin.settings.saveFilesLocations.splice(
+                  attachmentLocationIndex,
+                  1
+                );
+
+                await this.plugin.saveSettings();
+                this.display();
+                return;
+              }
+
+              attachmentLocationDeletePrimerTimer = setTimeout(
+                () => {
+                  deleteattachmentLocationPrimed = false;
+                  attachmentLocationEl.removeClass("primed");
+                },
+                1000 * 4 // 4 second timeout
+              );
+              deleteattachmentLocationPrimed = true;
+              attachmentLocationEl.addClass("primed");
+
+              new Notice(
+                `Click again to delete attachmentLocation ${
+                  attachmentLocationIndex + 1
+                }`
+              );
+            });
+        });
+
+      new Setting(attachmentLocationEl)
+        .setName("One")
+        .setDesc("One.")
+        .addSearch((search) => {});
+    }
+
+    const addattachmentLocationButtonEl = attachmentLocationsEl.createEl(
+      "div",
+      {
+        cls: "add-attachmentLocation-button-el",
+      }
+    );
+
+    new Setting(addattachmentLocationButtonEl).addButton((button) => {
+      button
+        .setButtonText("Add attachment location")
+        .setClass("add-attachmentLocation-button")
+        .onClick(async () => {
+          this.plugin.settings.saveFilesLocations.push({
+            cursorFilePattern: "",
+            targetLocation: "",
+          });
+          await this.plugin.saveSettings();
+          this.display();
+        });
+    });
 
     new Setting(containerEl)
       .setName("Blockquote Prefix")
