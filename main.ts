@@ -226,10 +226,15 @@ export default class PastetoIndentationPlugin extends Plugin {
               location.cursorFilePattern.length;
           }
         });
+        console.log(229, filesTargetLocation);
 
         if (files.length) {
           if (!(await app.vault.adapter.exists(filesTargetLocation))) {
             await app.vault.createFolder(filesTargetLocation);
+            console.log(
+              234,
+              await app.vault.adapter.exists(filesTargetLocation)
+            );
           }
         }
 
@@ -678,6 +683,50 @@ class SettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Blockquote Prefix")
+      .setDesc(
+        "Markdown syntax to signify that a line is part of a blockquote."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder(">•")
+          .setValue(
+            this.plugin.settings.blockquotePrefix ===
+              DEFAULT_SETTINGS.blockquotePrefix
+              ? ""
+              : this.plugin.settings.blockquotePrefix
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.blockquotePrefix =
+              value !== "" ? value : DEFAULT_SETTINGS.blockquotePrefix;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Escape characters in blockquotes")
+      .setDesc(
+        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of "${blockquoteCharactersToEscape}" characters.`
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(
+            this.plugin.settings.escapeCharactersInBlockquotes ||
+              DEFAULT_SETTINGS.escapeCharactersInBlockquotes
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.escapeCharactersInBlockquotes = value;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    const attachmentsEl = containerEl.createEl("div");
+    attachmentsEl.addClass("attachment-locations");
+    attachmentsEl.createEl("h3", {
+      text: "Attachments",
+    });
+
+    new Setting(attachmentsEl)
       .setName("Default attachment folder path")
       .setDesc(
         `When saving files from the clipboard, place them in this folder.`
@@ -694,10 +743,10 @@ class SettingTab extends PluginSettingTab {
           });
       });
 
-    const attachmentOverrideLocationsEl = containerEl.createEl("div");
+    const attachmentOverrideLocationsEl = attachmentsEl.createEl("div");
     attachmentOverrideLocationsEl.addClass("attachment-locations");
-    attachmentOverrideLocationsEl.createEl("h3", {
-      text: "Attachment Overrides",
+    attachmentOverrideLocationsEl.createEl("h4", {
+      text: "Attachment overrides",
     });
 
     const attachmentOverrideLocations =
@@ -708,7 +757,7 @@ class SettingTab extends PluginSettingTab {
     ] of attachmentOverrideLocations.entries()) {
       const attachmentLocationEl =
         attachmentOverrideLocationsEl.createEl("div");
-      attachmentLocationEl.addClass("attachmentLocation");
+      attachmentLocationEl.addClass("attachment-override");
 
       let deleteAttachmentLocationPrimed = false;
       let attachmentLocationDeletePrimerTimer: ReturnType<
@@ -802,43 +851,5 @@ class SettingTab extends PluginSettingTab {
           this.display();
         });
     });
-
-    new Setting(containerEl)
-      .setName("Blockquote Prefix")
-      .setDesc(
-        "Markdown syntax to signify that a line is part of a blockquote."
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder(">•")
-          .setValue(
-            this.plugin.settings.blockquotePrefix ===
-              DEFAULT_SETTINGS.blockquotePrefix
-              ? ""
-              : this.plugin.settings.blockquotePrefix
-          )
-          .onChange(async (value) => {
-            this.plugin.settings.blockquotePrefix =
-              value !== "" ? value : DEFAULT_SETTINGS.blockquotePrefix;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Escape characters in blockquotes")
-      .setDesc(
-        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of "${blockquoteCharactersToEscape}" characters.`
-      )
-      .addToggle((toggle) => {
-        toggle
-          .setValue(
-            this.plugin.settings.escapeCharactersInBlockquotes ||
-              DEFAULT_SETTINGS.escapeCharactersInBlockquotes
-          )
-          .onChange(async (value) => {
-            this.plugin.settings.escapeCharactersInBlockquotes = value;
-            await this.plugin.saveSettings();
-          });
-      });
   }
 }
