@@ -294,7 +294,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
         const leadingWhitespaceMatch = editor
           .getLine(editor.getCursor().line)
-          .match(new RegExp(`^(\\s*)([-\\*]\\s)?`));
+          .match(new RegExp(`^(\\s*)(.*)?`));
         const leadingWhitespace =
           leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
@@ -302,7 +302,11 @@ export default class PastetoIndentationPlugin extends Plugin {
         const additionalLeadingWhitespace =
           leadingWhitespaceMatch !== null &&
           leadingWhitespaceMatch[2] !== undefined
-            ? "  "
+            ? " ".repeat(
+                leadingWhitespaceMatch[2].length > 3
+                  ? 3
+                  : leadingWhitespaceMatch[2].length
+              )
             : "";
 
         if (
