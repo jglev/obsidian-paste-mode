@@ -148,7 +148,10 @@ interface PastetoIndentationPluginSettings {
   saveFilesOverrideLocations: AttachmentLocation[];
   apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
+  blockquoteEscapeCharactersRegex: string;
 }
+
+const defaultBlockquoteEscapeCharacters = "(==|<)";
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
@@ -158,9 +161,8 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   saveFilesOverrideLocations: [],
   apiVersion: 5,
   escapeCharactersInBlockquotes: false,
+  blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
 };
-
-const blockquoteCharactersToEscape = "<";
 
 for (const [key, value] of Object.entries(pluginIcons)) {
   addIcon(key, value);
@@ -226,15 +228,10 @@ export default class PastetoIndentationPlugin extends Plugin {
               location.cursorFilePattern.length;
           }
         });
-        console.log(229, filesTargetLocation);
 
         if (files.length) {
           if (!(await app.vault.adapter.exists(filesTargetLocation))) {
             await app.vault.createFolder(filesTargetLocation);
-            console.log(
-              234,
-              await app.vault.adapter.exists(filesTargetLocation)
-            );
           }
         }
 
@@ -401,10 +398,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           if (this.settings.escapeCharactersInBlockquotes) {
             const charactersToEscape = [
               ...output.matchAll(
-                new RegExp(
-                  `[${escapeRegExp(blockquoteCharactersToEscape)}]`,
-                  "g"
-                )
+                new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g")
               ),
             ]
               .map((x) => x.index)
@@ -610,6 +604,12 @@ export default class PastetoIndentationPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
+    if (!this.settings?.blockquoteEscapeCharactersRegex) {
+      this.settings.blockquoteEscapeCharactersRegex =
+        DEFAULT_SETTINGS.blockquoteEscapeCharactersRegex;
+      this.saveSettings();
+    }
+
     if (!Object.values(Mode).includes(this.settings.mode)) {
       this.settings.mode = Object.values(Mode)[0];
       this.saveSettings();
@@ -710,7 +710,7 @@ class SettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Escape characters in blockquotes")
       .setDesc(
-        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of "${blockquoteCharactersToEscape}" characters.`
+        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of specific characters.`
       )
       .addToggle((toggle) => {
         toggle
@@ -720,6 +720,27 @@ class SettingTab extends PluginSettingTab {
           )
           .onChange(async (value) => {
             this.plugin.settings.escapeCharactersInBlockquotes = value;
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Escape characters regex")
+      .setDesc(
+        `A Regular Expression expressing which characters to escape when pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode.`
+      )
+      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.blockquoteEscapeCharactersRegex ||
+              defaultBlockquoteEscapeCharacters
+          )
+          .setPlaceholder(defaultBlockquoteEscapeCharacters)
+          .onChange(async (value) => {
+            this.plugin.settings.blockquoteEscapeCharactersRegex =
+              value || defaultBlockquoteEscapeCharacters;
             await this.plugin.saveSettings();
           });
       });

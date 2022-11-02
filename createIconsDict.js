@@ -18,9 +18,7 @@ for (const f of iconFiles) {
 }
 
 fs.writeFile('icons.json', JSON.stringify(iconsDict), (err) => {
-  // throws an error, you could also catch it here
   if (err) throw err;
 
-  // success case, the file was saved
-  console.log('Icons file updated.');
+  // console.log('Icons file updated.');
 });
