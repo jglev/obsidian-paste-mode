@@ -251,33 +251,6 @@ export default class PastetoIndentationPlugin extends Plugin {
             await fileObject.arrayBuffer()
           );
 
-          console.log(
-            253,
-            this.app.metadataCache.getFirstLinkpathDest(fileName, "")
-          );
-
-          console.log(254, this.app.vault.getFiles());
-
-          console.log(261, this.app.metadataCache.getCache(fileName));
-
-          // await new Promise((r) => setTimeout(r, 2000));
-
-          this.app.metadataCache.on("resolved", () => {
-            console.log(264, this.app.vault.getFiles());
-          });
-
-          console.log(
-            253,
-            this.app.metadataCache.getFirstLinkpathDest(fileName, "")
-          );
-
-          console.log(254, this.app.vault.getFiles());
-
-          // const tfileObject = this.app.vault.getFiles().filter((f) => {
-          //   console.log(261, f.path, fileName);
-          //   return f.path === fileName;
-          // })[0];
-
           // Wait for the Obsidian metadata cache to catch up to the
           // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
           // there is currently no way to force a metadata cache refresh,
@@ -288,14 +261,15 @@ export default class PastetoIndentationPlugin extends Plugin {
             ""
           );
           while (!tfileObject && nFileTries < 10) {
-            console.log(287);
             tfileObject = this.app.metadataCache.getFirstLinkpathDest(
               fileName,
               ""
             );
 
             nFileTries += 1;
-            await new Promise((r) => setTimeout(r, 100));
+            if (!tfileObject) {
+              await new Promise((r) => setTimeout(r, 100));
+            }
           }
 
           if (tfileObject === undefined) {
@@ -306,8 +280,6 @@ export default class PastetoIndentationPlugin extends Plugin {
             tfileObject,
             this.app.workspace.getActiveFile().path
           );
-
-          console.log(295, link);
 
           fileLinks.push(link);
         }
@@ -321,53 +293,38 @@ export default class PastetoIndentationPlugin extends Plugin {
           // Find all elements with a src attribute:
           const srcContainingElements = htmlDom.querySelectorAll("[src]");
 
-          console.log(274, htmlDom, srcContainingElements);
-
           let overwriteClipboardContents = false;
 
           for (const [i, el] of srcContainingElements.entries()) {
             const src = el.getAttr("src");
-            console.log(290, src);
             if (
               this.settings.srcAttributeCopyRegex &&
               new RegExp(this.settings.srcAttributeCopyRegex).test(src)
             ) {
               overwriteClipboardContents = true;
-              console.log(296);
               await fetch(src, {})
                 .then(async (response) => await response.blob())
                 .then(async (blob) => {
                   const dataURL: string = await new Promise(
                     (resolve, reject) => {
-                      console.log(292);
                       const urlReader = new FileReader();
-                      console.log(295);
                       urlReader.readAsDataURL(blob);
-                      console.log(297);
                       urlReader.onload = () => {
-                        console.log(299);
                         const b64 = urlReader.result;
                         resolve(b64.toString());
-                        console.log(302);
                       };
                     }
                   );
 
                   srcContainingElements[i].setAttr("src", dataURL);
-                  console.log(307);
                 });
             }
           }
-
-          console.log(320, htmlDom.documentElement.outerHTML);
-
-          console.log(322, htmlToMarkdown(htmlDom.documentElement.outerHTML));
 
           if (overwriteClipboardContents) {
             clipboardContents = htmlToMarkdown(
               htmlDom.documentElement.innerHTML
             );
-            console.log(323);
           }
 
           // htmlToMarkdown() will return a blank string if
