@@ -246,30 +246,56 @@ export default class PastetoIndentationPlugin extends Plugin {
             fileObject.type.split("/")[1]
           );
 
-          await app.vault.adapter.writeBinary(
+          let tfileObject = await app.vault.createBinary(
             fileName,
             await fileObject.arrayBuffer()
           );
 
-          // Wait for the Obsidian metadata cache to catch up to the
-          // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
-          // there is currently no way to force a metadata cache refresh,
-          // unfortunately.
-          let nFileTries = 0;
-          let tfileObject = this.app.metadataCache.getFirstLinkpathDest(
-            fileName,
-            ""
-          );
-          while (!tfileObject && nFileTries < 10) {
+          // Per the API spec (https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3626),
+          // createBinary() is supposed to return a Promise<TFile>, but seems
+          // at least currently to return a Promise<null>, so we handle that
+          // here:
+          if (tfileObject === null) {
+            console.log(
+              "Paste to Current Indentation: Waiting for pasted file to become available..."
+            );
+            // Wait for the Obsidian metadata cache to catch up to the
+            // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
+            // there is currently no way to force a metadata cache refresh,
+            // unfortunately.
+            let nFileTries = 0;
             tfileObject = this.app.metadataCache.getFirstLinkpathDest(
               fileName,
               ""
             );
+            while (!tfileObject && nFileTries < 30) {
+              console.log(
+                `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${
+                  nFileTries + 1
+                })`
+              );
+              if (nFileTries === 10) {
+                new Notice(
+                  `Paste to Current Indentation: Waiting for pasted file to become available...`
+                );
+              }
 
-            nFileTries += 1;
-            if (!tfileObject) {
-              await new Promise((r) => setTimeout(r, 100));
+              tfileObject = this.app.metadataCache.getFirstLinkpathDest(
+                fileName,
+                ""
+              );
+
+              nFileTries += 1;
+              if (!tfileObject) {
+                await new Promise((r) => setTimeout(r, 100));
+              }
             }
+          }
+
+          if (tfileObject === null) {
+            new Notice(
+              `Error: Pasted file created at ${fileName}, but the plugin cannot currently access it. (This is not an error caused by anything you did.)`
+            );
           }
 
           if (tfileObject === undefined) {
@@ -390,7 +416,7 @@ export default class PastetoIndentationPlugin extends Plugin {
               await app.vault.createFolder(filesTargetLocation);
             }
 
-            await app.vault.adapter.writeBinary(
+            await app.vault.createBinary(
               imageFileName,
               base64ToArrayBuffer(image.groups.data)
             );
