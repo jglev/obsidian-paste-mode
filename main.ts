@@ -251,9 +251,52 @@ export default class PastetoIndentationPlugin extends Plugin {
             await fileObject.arrayBuffer()
           );
 
-          const tfileObject = this.app.vault.getFiles().filter((f) => {
-            return f.path === fileName;
-          })[0];
+          console.log(
+            253,
+            this.app.metadataCache.getFirstLinkpathDest(fileName, "")
+          );
+
+          console.log(254, this.app.vault.getFiles());
+
+          console.log(261, this.app.metadataCache.getCache(fileName));
+
+          // await new Promise((r) => setTimeout(r, 2000));
+
+          this.app.metadataCache.on("resolved", () => {
+            console.log(264, this.app.vault.getFiles());
+          });
+
+          console.log(
+            253,
+            this.app.metadataCache.getFirstLinkpathDest(fileName, "")
+          );
+
+          console.log(254, this.app.vault.getFiles());
+
+          // const tfileObject = this.app.vault.getFiles().filter((f) => {
+          //   console.log(261, f.path, fileName);
+          //   return f.path === fileName;
+          // })[0];
+
+          // Wait for the Obsidian metadata cache to catch up to the
+          // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
+          // there is currently no way to force a metadata cache refresh,
+          // unfortunately.
+          let nFileTries = 0;
+          let tfileObject = this.app.metadataCache.getFirstLinkpathDest(
+            fileName,
+            ""
+          );
+          while (!tfileObject && nFileTries < 10) {
+            console.log(287);
+            tfileObject = this.app.metadataCache.getFirstLinkpathDest(
+              fileName,
+              ""
+            );
+
+            nFileTries += 1;
+            await new Promise((r) => setTimeout(r, 100));
+          }
 
           if (tfileObject === undefined) {
             continue;
@@ -263,6 +306,8 @@ export default class PastetoIndentationPlugin extends Plugin {
             tfileObject,
             this.app.workspace.getActiveFile().path
           );
+
+          console.log(295, link);
 
           fileLinks.push(link);
         }
