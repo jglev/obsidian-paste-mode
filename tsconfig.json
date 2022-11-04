@@ -17,7 +17,8 @@
       "es5",
       "scripthost",
       "es2021",
-      "ESNext.String"
+      "ESNext.String",
+      "dom.iterable"
     ]
   },
   "include": [

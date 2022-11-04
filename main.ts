@@ -149,9 +149,11 @@ interface PastetoIndentationPluginSettings {
   apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
   blockquoteEscapeCharactersRegex: string;
+  srcAttributeCopyRegex: string;
 }
 
 const defaultBlockquoteEscapeCharacters = "(==|<)";
+const defaultSrcAttributeCopyRegex = "";
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
@@ -162,6 +164,7 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   apiVersion: 5,
   escapeCharactersInBlockquotes: false,
   blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
+  srcAttributeCopyRegex: defaultSrcAttributeCopyRegex,
 };
 
 for (const [key, value] of Object.entries(pluginIcons)) {
@@ -265,8 +268,63 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          const clipboardHtml = evt.clipboardData.getData("text/html");
+          let clipboardHtml = evt.clipboardData.getData("text/html");
           clipboardContents = htmlToMarkdown(clipboardHtml);
+
+          const parser = new DOMParser();
+          const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
+          // Find all elements with a src attribute:
+          const srcContainingElements = htmlDom.querySelectorAll("[src]");
+
+          console.log(274, htmlDom, srcContainingElements);
+
+          let overwriteClipboardContents = false;
+
+          for (const [i, el] of srcContainingElements.entries()) {
+            const src = el.getAttr("src");
+            console.log(290, src);
+            if (
+              this.settings.srcAttributeCopyRegex &&
+              new RegExp(this.settings.srcAttributeCopyRegex).test(src)
+            ) {
+              overwriteClipboardContents = true;
+              console.log(296);
+              await fetch(src, {})
+                .then(async (response) => await response.blob())
+                .then(async (blob) => {
+                  const dataURL: string = await new Promise(
+                    (resolve, reject) => {
+                      console.log(292);
+                      const urlReader = new FileReader();
+                      console.log(295);
+                      urlReader.readAsDataURL(blob);
+                      console.log(297);
+                      urlReader.onload = () => {
+                        console.log(299);
+                        const b64 = urlReader.result;
+                        resolve(b64.toString());
+                        console.log(302);
+                      };
+                    }
+                  );
+
+                  srcContainingElements[i].setAttr("src", dataURL);
+                  console.log(307);
+                });
+            }
+          }
+
+          console.log(320, htmlDom.documentElement.outerHTML);
+
+          console.log(322, htmlToMarkdown(htmlDom.documentElement.outerHTML));
+
+          if (overwriteClipboardContents) {
+            clipboardContents = htmlToMarkdown(
+              htmlDom.documentElement.innerHTML
+            );
+            console.log(323);
+          }
+
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
           // we will switch to the equivalent Text mode:
@@ -604,12 +662,6 @@ export default class PastetoIndentationPlugin extends Plugin {
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
-    if (!this.settings?.blockquoteEscapeCharactersRegex) {
-      this.settings.blockquoteEscapeCharactersRegex =
-        DEFAULT_SETTINGS.blockquoteEscapeCharactersRegex;
-      this.saveSettings();
-    }
-
     if (!Object.values(Mode).includes(this.settings.mode)) {
       this.settings.mode = Object.values(Mode)[0];
       this.saveSettings();
@@ -741,6 +793,25 @@ class SettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.blockquoteEscapeCharactersRegex =
               value || defaultBlockquoteEscapeCharacters;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("src attribute copy regex")
+      .setDesc(
+        `If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.`
+      )
+      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.srcAttributeCopyRegex ||
+              defaultSrcAttributeCopyRegex
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.srcAttributeCopyRegex =
+              value || defaultSrcAttributeCopyRegex;
             await this.plugin.saveSettings();
           });
       });
