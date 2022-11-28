@@ -4,8 +4,10 @@ import {
   apiVersion,
   App,
   base64ToArrayBuffer,
+  getBlobArrayBuffer,
   Editor,
   EditorTransaction,
+  FileSystemAdapter,
   FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
@@ -35,6 +37,57 @@ enum Mode {
   CodeBlockBlockquote = "Code Block (Blockquote)",
   Passthrough = "Passthrough",
 }
+
+const createTFileObject = async (
+  fileName: string,
+  arrayBuffer: ArrayBuffer,
+  app: App
+) => {
+  let tfileObject = await app.vault.createBinary(fileName, arrayBuffer);
+
+  // Per the API spec (https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3626),
+  // createBinary() is supposed to return a Promise<TFile>, but seems
+  // at least currently to return a Promise<null>, so we handle that
+  // here:
+  if (tfileObject === null) {
+    console.log(
+      "Paste to Current Indentation: Waiting for pasted file to become available..."
+    );
+    // Wait for the Obsidian metadata cache to catch up to the
+    // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
+    // there is currently no way to force a metadata cache refresh,
+    // unfortunately.
+    let nFileTries = 0;
+    tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
+    while (!tfileObject && nFileTries < 30) {
+      console.log(
+        `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${
+          nFileTries + 1
+        })`
+      );
+      if (nFileTries === 10) {
+        new Notice(
+          `Paste to Current Indentation: Waiting for pasted file to become available...`
+        );
+      }
+
+      tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
+
+      nFileTries += 1;
+      if (!tfileObject) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
+  }
+
+  if (tfileObject === null) {
+    new Notice(
+      `Error: Pasted file created at ${fileName}, but the plugin cannot currently access it. (This is not an error caused by anything you did.)`
+    );
+  }
+
+  return tfileObject;
+};
 
 const createImageFileName = async (
   fileLocation: string,
@@ -196,6 +249,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
         // "Check for `evt.defaultPrevented` before attempting to handle this
         // event, and return if it has been already handled."
+        console.log(252);
         if (evt.defaultPrevented) {
           return;
         }
@@ -207,6 +261,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         evt.preventDefault();
+        console.log(263);
 
         let clipboardContents = "";
         let output = "";
@@ -231,72 +286,31 @@ export default class PastetoIndentationPlugin extends Plugin {
               location.cursorFilePattern.length;
           }
         });
+        console.log(288);
 
         if (files.length) {
           if (!(await app.vault.adapter.exists(filesTargetLocation))) {
             await app.vault.createFolder(filesTargetLocation);
           }
         }
+        console.log(295);
 
         for (var i = 0; i < files.length; i++) {
           const fileObject = files[i];
+          console.log(299);
 
           const fileName = await createImageFileName(
             filesTargetLocation,
             fileObject.type.split("/")[1]
           );
+          console.log(305);
 
-          let tfileObject = await app.vault.createBinary(
+          const tfileObject = await createTFileObject(
             fileName,
-            await fileObject.arrayBuffer()
+            await fileObject.arrayBuffer(),
+            app
           );
-
-          // Per the API spec (https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3626),
-          // createBinary() is supposed to return a Promise<TFile>, but seems
-          // at least currently to return a Promise<null>, so we handle that
-          // here:
-          if (tfileObject === null) {
-            console.log(
-              "Paste to Current Indentation: Waiting for pasted file to become available..."
-            );
-            // Wait for the Obsidian metadata cache to catch up to the
-            // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
-            // there is currently no way to force a metadata cache refresh,
-            // unfortunately.
-            let nFileTries = 0;
-            tfileObject = this.app.metadataCache.getFirstLinkpathDest(
-              fileName,
-              ""
-            );
-            while (!tfileObject && nFileTries < 30) {
-              console.log(
-                `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${
-                  nFileTries + 1
-                })`
-              );
-              if (nFileTries === 10) {
-                new Notice(
-                  `Paste to Current Indentation: Waiting for pasted file to become available...`
-                );
-              }
-
-              tfileObject = this.app.metadataCache.getFirstLinkpathDest(
-                fileName,
-                ""
-              );
-
-              nFileTries += 1;
-              if (!tfileObject) {
-                await new Promise((r) => setTimeout(r, 100));
-              }
-            }
-          }
-
-          if (tfileObject === null) {
-            new Notice(
-              `Error: Pasted file created at ${fileName}, but the plugin cannot currently access it. (This is not an error caused by anything you did.)`
-            );
-          }
+          console.log(312);
 
           if (tfileObject === undefined) {
             continue;
@@ -311,15 +325,13 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+          console.log(315);
           let clipboardHtml = evt.clipboardData.getData("text/html");
-          clipboardContents = htmlToMarkdown(clipboardHtml);
 
           const parser = new DOMParser();
           const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
           // Find all elements with a src attribute:
           const srcContainingElements = htmlDom.querySelectorAll("[src]");
-
-          let overwriteClipboardContents = false;
 
           for (const [i, el] of srcContainingElements.entries()) {
             const src = el.getAttr("src");
@@ -327,31 +339,102 @@ export default class PastetoIndentationPlugin extends Plugin {
               this.settings.srcAttributeCopyRegex &&
               new RegExp(this.settings.srcAttributeCopyRegex).test(src)
             ) {
-              overwriteClipboardContents = true;
-              await fetch(src, {})
-                .then(async (response) => await response.blob())
-                .then(async (blob) => {
-                  const dataURL: string = await new Promise(
-                    (resolve, reject) => {
-                      const urlReader = new FileReader();
-                      urlReader.readAsDataURL(blob);
-                      urlReader.onload = () => {
-                        const b64 = urlReader.result;
-                        resolve(b64.toString());
-                      };
-                    }
-                  );
+              let dataBlob: Blob;
+              // If src starts with 'file://', we won't be able to get it using
+              // fetch(), as it's on the local filesystem. In that case, we'll
+              // need to use Obsidian's Node fs adapter:
 
-                  srcContainingElements[i].setAttr("src", dataURL);
-                });
+              if (src.startsWith("app://obsidian.md")) {
+                // We're dealing with a relative src path, which then got
+                // prepended with app://obsidian.md. Thus, we won't be able
+                // to handle it:
+                // urlForDownloading = src.replace(
+                //   /^app:\/\/obsidian.md/,
+                //   // @ts-ignore
+                //   this.app.vault.adapter.basePath
+                // );
+
+                continue;
+              }
+
+              const srcIsLocalFile = src.startsWith("file://"); // ||
+              // src.startsWith("app://obsidian.md") ||
+
+              // We want to avoid CORS errors from downloading from localhost,
+              // and so will use the readLocalFile() method for any local
+              // file:
+              // !new RegExp("^([a-zA-Z])+://").test(src);
+
+              console.log(
+                338,
+                src,
+                srcIsLocalFile,
+                src.startsWith("file://"),
+                new RegExp("^([a-zA-Z])+://").test(src)
+              );
+
+              if (srcIsLocalFile) {
+                let urlForDownloading = src;
+
+                if (src.startsWith("file://")) {
+                  urlForDownloading = src.replace(/^file:\/\//, "");
+                }
+
+                dataBlob = new Blob([
+                  await FileSystemAdapter.readLocalFile(urlForDownloading),
+                ]);
+                console.log(377, dataBlob);
+              } else {
+                console.log(378, src);
+                await fetch(src, {})
+                  .then(async (response) => await response.blob())
+                  .then(async (blob) => {
+                    dataBlob = blob;
+                  });
+              }
+
+              if (dataBlob) {
+                console.log(388, dataBlob, await getBlobArrayBuffer(dataBlob));
+                const fileName = await createImageFileName(
+                  filesTargetLocation,
+                  src.split(".")[src.split(".").length - 1]
+                );
+                console.log(398, fileName);
+                const tfileObject = await createTFileObject(
+                  fileName,
+                  await getBlobArrayBuffer(dataBlob),
+                  this.app
+                );
+
+                // const dataURL: string = await new Promise((resolve, reject) => {
+                //   const urlReader = new FileReader();
+                //   urlReader.readAsDataURL(dataBlob);
+                //   urlReader.onload = () => {
+                //     const b64 = urlReader.result;
+                //     resolve(b64.toString());
+                //   };
+                // });
+
+                console.log(
+                  406,
+                  srcContainingElements[i],
+                  srcContainingElements[i].getAttr("src")
+                );
+
+                srcContainingElements[i].setAttr(
+                  "src",
+                  encodeURI(tfileObject.path)
+                );
+
+                console.log(410, srcContainingElements[i].getAttr("src"));
+              }
             }
           }
+          console.log(400, htmlDom.querySelectorAll("[src]"));
+          console.log(401, htmlDom.documentElement.innerHTML);
 
-          if (overwriteClipboardContents) {
-            clipboardContents = htmlToMarkdown(
-              htmlDom.documentElement.innerHTML
-            );
-          }
+          clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
+          console.log(433, clipboardContents);
 
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
