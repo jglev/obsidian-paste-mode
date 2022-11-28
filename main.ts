@@ -249,7 +249,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
         // "Check for `evt.defaultPrevented` before attempting to handle this
         // event, and return if it has been already handled."
-        console.log(252);
         if (evt.defaultPrevented) {
           return;
         }
@@ -261,7 +260,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         evt.preventDefault();
-        console.log(263);
 
         let clipboardContents = "";
         let output = "";
@@ -286,31 +284,26 @@ export default class PastetoIndentationPlugin extends Plugin {
               location.cursorFilePattern.length;
           }
         });
-        console.log(288);
 
         if (files.length) {
           if (!(await app.vault.adapter.exists(filesTargetLocation))) {
             await app.vault.createFolder(filesTargetLocation);
           }
         }
-        console.log(295);
 
         for (var i = 0; i < files.length; i++) {
           const fileObject = files[i];
-          console.log(299);
 
           const fileName = await createImageFileName(
             filesTargetLocation,
             fileObject.type.split("/")[1]
           );
-          console.log(305);
 
           const tfileObject = await createTFileObject(
             fileName,
             await fileObject.arrayBuffer(),
             app
           );
-          console.log(312);
 
           if (tfileObject === undefined) {
             continue;
@@ -325,7 +318,6 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          console.log(315);
           let clipboardHtml = evt.clipboardData.getData("text/html");
 
           const parser = new DOMParser();
@@ -364,15 +356,6 @@ export default class PastetoIndentationPlugin extends Plugin {
               // and so will use the readLocalFile() method for any local
               // file:
               // !new RegExp("^([a-zA-Z])+://").test(src);
-
-              console.log(
-                338,
-                src,
-                srcIsLocalFile,
-                src.startsWith("file://"),
-                new RegExp("^([a-zA-Z])+://").test(src)
-              );
-
               if (srcIsLocalFile) {
                 let urlForDownloading = src;
 
@@ -383,9 +366,7 @@ export default class PastetoIndentationPlugin extends Plugin {
                 dataBlob = new Blob([
                   await FileSystemAdapter.readLocalFile(urlForDownloading),
                 ]);
-                console.log(377, dataBlob);
               } else {
-                console.log(378, src);
                 await fetch(src, {})
                   .then(async (response) => await response.blob())
                   .then(async (blob) => {
@@ -394,12 +375,10 @@ export default class PastetoIndentationPlugin extends Plugin {
               }
 
               if (dataBlob) {
-                console.log(388, dataBlob, await getBlobArrayBuffer(dataBlob));
                 const fileName = await createImageFileName(
                   filesTargetLocation,
                   src.split(".")[src.split(".").length - 1]
                 );
-                console.log(398, fileName);
                 const tfileObject = await createTFileObject(
                   fileName,
                   await getBlobArrayBuffer(dataBlob),
@@ -415,26 +394,15 @@ export default class PastetoIndentationPlugin extends Plugin {
                 //   };
                 // });
 
-                console.log(
-                  406,
-                  srcContainingElements[i],
-                  srcContainingElements[i].getAttr("src")
-                );
-
                 srcContainingElements[i].setAttr(
                   "src",
                   encodeURI(tfileObject.path)
                 );
-
-                console.log(410, srcContainingElements[i].getAttr("src"));
               }
             }
           }
-          console.log(400, htmlDom.querySelectorAll("[src]"));
-          console.log(401, htmlDom.documentElement.innerHTML);
 
           clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
-          console.log(433, clipboardContents);
 
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
