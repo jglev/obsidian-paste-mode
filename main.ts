@@ -61,8 +61,7 @@ const createTFileObject = async (
     tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
     while (!tfileObject && nFileTries < 30) {
       console.log(
-        `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${
-          nFileTries + 1
+        `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${nFileTries + 1
         })`
       );
       if (nFileTries === 10) {
@@ -102,11 +101,10 @@ const createImageFileName = async (
   let imageFileNameIndex = 0;
   let imageFileNameWithIndex = imageFileName;
   while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
-    imageFileNameWithIndex = `${
-      fileLocation || "."
-    }/Pasted image ${moment().format(
-      "YYYYMMDDHHmmss"
-    )}_${imageFileNameIndex}.${extension}`;
+    imageFileNameWithIndex = `${fileLocation || "."
+      }/Pasted image ${moment().format(
+        "YYYYMMDDHHmmss"
+      )}_${imageFileNameIndex}.${extension}`;
     imageFileNameIndex += 1;
   }
   imageFileName = imageFileNameWithIndex;
@@ -252,14 +250,13 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.defaultPrevented) {
           return;
         }
+        evt.preventDefault();
 
         let mode = this.settings.mode;
 
         if (mode === Mode.Passthrough) {
           return;
         }
-
-        evt.preventDefault();
 
         let clipboardContents = "";
         let output = "";
@@ -359,13 +356,14 @@ export default class PastetoIndentationPlugin extends Plugin {
               if (srcIsLocalFile) {
                 let urlForDownloading = src;
 
-                if (src.startsWith("file://")) {
-                  urlForDownloading = src.replace(/^file:\/\//, "");
+                if (src.startsWith("file:///")) {
+                  urlForDownloading = src.replace(/^file:\/\/\//, "");
                 }
 
                 dataBlob = new Blob([
                   await FileSystemAdapter.readLocalFile(urlForDownloading),
                 ]);
+
               } else {
                 await fetch(src, {})
                   .then(async (response) => await response.blob())
@@ -435,12 +433,12 @@ export default class PastetoIndentationPlugin extends Plugin {
         // The length of `- ` / `* `, to accomodate a bullet list:
         const additionalLeadingWhitespace =
           leadingWhitespaceMatch !== null &&
-          leadingWhitespaceMatch[2] !== undefined
+            leadingWhitespaceMatch[2] !== undefined
             ? " ".repeat(
-                leadingWhitespaceMatch[2].length > 3
-                  ? 3
-                  : leadingWhitespaceMatch[2].length
-              )
+              leadingWhitespaceMatch[2].length > 3
+                ? 3
+                : leadingWhitespaceMatch[2].length
+            )
             : "";
 
         if (
@@ -809,7 +807,7 @@ class SettingTab extends PluginSettingTab {
         toggle
           .setValue(
             this.plugin.settings.saveBase64EncodedFiles ||
-              DEFAULT_SETTINGS.saveBase64EncodedFiles
+            DEFAULT_SETTINGS.saveBase64EncodedFiles
           )
           .onChange(async (value) => {
             this.plugin.settings.saveBase64EncodedFiles = value;
@@ -847,7 +845,7 @@ class SettingTab extends PluginSettingTab {
         toggle
           .setValue(
             this.plugin.settings.escapeCharactersInBlockquotes ||
-              DEFAULT_SETTINGS.escapeCharactersInBlockquotes
+            DEFAULT_SETTINGS.escapeCharactersInBlockquotes
           )
           .onChange(async (value) => {
             this.plugin.settings.escapeCharactersInBlockquotes = value;
@@ -866,7 +864,7 @@ class SettingTab extends PluginSettingTab {
         text
           .setValue(
             this.plugin.settings.blockquoteEscapeCharactersRegex ||
-              defaultBlockquoteEscapeCharacters
+            defaultBlockquoteEscapeCharacters
           )
           .setPlaceholder(defaultBlockquoteEscapeCharacters)
           .onChange(async (value) => {
@@ -886,7 +884,7 @@ class SettingTab extends PluginSettingTab {
         text
           .setValue(
             this.plugin.settings.srcAttributeCopyRegex ||
-              defaultSrcAttributeCopyRegex
+            defaultSrcAttributeCopyRegex
           )
           .onChange(async (value) => {
             this.plugin.settings.srcAttributeCopyRegex =
@@ -910,7 +908,7 @@ class SettingTab extends PluginSettingTab {
         text
           .setValue(
             this.plugin.settings.saveFilesLocation ||
-              DEFAULT_SETTINGS.saveFilesLocation
+            DEFAULT_SETTINGS.saveFilesLocation
           )
           .onChange(async (value) => {
             this.plugin.settings.saveFilesLocation = value;
@@ -1000,8 +998,7 @@ class SettingTab extends PluginSettingTab {
               attachmentLocationEl.addClass("primed");
 
               new Notice(
-                `Click again to delete attachmentLocation ${
-                  attachmentLocationIndex + 1
+                `Click again to delete attachmentLocation ${attachmentLocationIndex + 1
                 }`
               );
             });
