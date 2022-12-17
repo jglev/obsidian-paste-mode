@@ -21,3 +21,10 @@
   margin-top: 0;
   padding-top: 0;
 }
+.setting-item {
+  opacity: 100%;
+}
+
+.setting-item.is-disabled {
+  opacity: 60%;
+}

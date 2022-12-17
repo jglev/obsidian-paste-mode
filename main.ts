@@ -4,8 +4,10 @@ import {
   apiVersion,
   App,
   base64ToArrayBuffer,
+  getBlobArrayBuffer,
   Editor,
   EditorTransaction,
+  FileSystemAdapter,
   FuzzySuggestModal,
   htmlToMarkdown,
   MarkdownView,
@@ -36,6 +38,56 @@ enum Mode {
   Passthrough = "Passthrough",
 }
 
+const createTFileObject = async (
+  fileName: string,
+  arrayBuffer: ArrayBuffer,
+  app: App
+) => {
+  let tfileObject = await app.vault.createBinary(fileName, arrayBuffer);
+
+  // Per the API spec (https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3626),
+  // createBinary() is supposed to return a Promise<TFile>, but seems
+  // at least currently to return a Promise<null>, so we handle that
+  // here:
+  if (tfileObject === null) {
+    console.log(
+      "Paste Mode: Waiting for pasted file to become available..."
+    );
+    // Wait for the Obsidian metadata cache to catch up to the
+    // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
+    // there is currently no way to force a metadata cache refresh,
+    // unfortunately.
+    let nFileTries = 0;
+    tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
+    while (!tfileObject && nFileTries < 30) {
+      console.log(
+        `Paste Mode: Waiting for pasted file to become available... (attempt ${nFileTries + 1
+        })`
+      );
+      if (nFileTries === 10) {
+        new Notice(
+          `Paste Mode: Waiting for pasted file to become available...`
+        );
+      }
+
+      tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
+
+      nFileTries += 1;
+      if (!tfileObject) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
+  }
+
+  if (tfileObject === null) {
+    new Notice(
+      `Error: Pasted file created at ${fileName}, but the plugin cannot currently access it. (This is not an error caused by anything you did.)`
+    );
+  }
+
+  return tfileObject;
+};
+
 const createImageFileName = async (
   fileLocation: string,
   extension: string
@@ -49,11 +101,10 @@ const createImageFileName = async (
   let imageFileNameIndex = 0;
   let imageFileNameWithIndex = imageFileName;
   while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
-    imageFileNameWithIndex = `${
-      fileLocation || "."
-    }/Pasted image ${moment().format(
-      "YYYYMMDDHHmmss"
-    )}_${imageFileNameIndex}.${extension}`;
+    imageFileNameWithIndex = `${fileLocation || "."
+      }/Pasted image ${moment().format(
+        "YYYYMMDDHHmmss"
+      )}_${imageFileNameIndex}.${extension}`;
     imageFileNameIndex += 1;
   }
   imageFileName = imageFileNameWithIndex;
@@ -148,7 +199,12 @@ interface PastetoIndentationPluginSettings {
   saveFilesOverrideLocations: AttachmentLocation[];
   apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
+  blockquoteEscapeCharactersRegex: string;
+  srcAttributeCopyRegex: string;
 }
+
+const defaultBlockquoteEscapeCharacters = "(==|<)";
+const defaultSrcAttributeCopyRegex = "";
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
@@ -158,9 +214,9 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   saveFilesOverrideLocations: [],
   apiVersion: 5,
   escapeCharactersInBlockquotes: false,
+  blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
+  srcAttributeCopyRegex: defaultSrcAttributeCopyRegex,
 };
-
-const blockquoteCharactersToEscape = "<";
 
 for (const [key, value] of Object.entries(pluginIcons)) {
   addIcon(key, value);
@@ -194,14 +250,13 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.defaultPrevented) {
           return;
         }
+        evt.preventDefault();
 
         let mode = this.settings.mode;
 
         if (mode === Mode.Passthrough) {
           return;
         }
-
-        evt.preventDefault();
 
         let clipboardContents = "";
         let output = "";
@@ -226,15 +281,10 @@ export default class PastetoIndentationPlugin extends Plugin {
               location.cursorFilePattern.length;
           }
         });
-        console.log(229, filesTargetLocation);
 
         if (files.length) {
           if (!(await app.vault.adapter.exists(filesTargetLocation))) {
             await app.vault.createFolder(filesTargetLocation);
-            console.log(
-              234,
-              await app.vault.adapter.exists(filesTargetLocation)
-            );
           }
         }
 
@@ -246,14 +296,11 @@ export default class PastetoIndentationPlugin extends Plugin {
             fileObject.type.split("/")[1]
           );
 
-          await app.vault.adapter.writeBinary(
+          const tfileObject = await createTFileObject(
             fileName,
-            await fileObject.arrayBuffer()
+            await fileObject.arrayBuffer(),
+            app
           );
-
-          const tfileObject = this.app.vault.getFiles().filter((f) => {
-            return f.path === fileName;
-          })[0];
 
           if (tfileObject === undefined) {
             continue;
@@ -268,8 +315,93 @@ export default class PastetoIndentationPlugin extends Plugin {
         }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          const clipboardHtml = evt.clipboardData.getData("text/html");
-          clipboardContents = htmlToMarkdown(clipboardHtml);
+          let clipboardHtml = evt.clipboardData.getData("text/html");
+
+          const parser = new DOMParser();
+          const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
+          // Find all elements with a src attribute:
+          const srcContainingElements = htmlDom.querySelectorAll("[src]");
+
+          for (const [i, el] of srcContainingElements.entries()) {
+            const src = el.getAttr("src");
+            if (
+              this.settings.srcAttributeCopyRegex &&
+              new RegExp(this.settings.srcAttributeCopyRegex).test(src)
+            ) {
+              let dataBlob: Blob;
+              // If src starts with 'file://', we won't be able to get it using
+              // fetch(), as it's on the local filesystem. In that case, we'll
+              // need to use Obsidian's Node fs adapter:
+
+              if (src.startsWith("app://obsidian.md")) {
+                // We're dealing with a relative src path, which then got
+                // prepended with app://obsidian.md. Thus, we won't be able
+                // to handle it:
+                // urlForDownloading = src.replace(
+                //   /^app:\/\/obsidian.md/,
+                //   // @ts-ignore
+                //   this.app.vault.adapter.basePath
+                // );
+
+                continue;
+              }
+
+              const srcIsLocalFile = src.startsWith("file://"); // ||
+              // src.startsWith("app://obsidian.md") ||
+
+              // We want to avoid CORS errors from downloading from localhost,
+              // and so will use the readLocalFile() method for any local
+              // file:
+              // !new RegExp("^([a-zA-Z])+://").test(src);
+              if (srcIsLocalFile) {
+                let urlForDownloading = src;
+
+                if (src.startsWith("file:///")) {
+                  urlForDownloading = src.replace(/^file:\/\/\//, "");
+                }
+
+                dataBlob = new Blob([
+                  await FileSystemAdapter.readLocalFile(urlForDownloading),
+                ]);
+
+              } else {
+                await fetch(src, {})
+                  .then(async (response) => await response.blob())
+                  .then(async (blob) => {
+                    dataBlob = blob;
+                  });
+              }
+
+              if (dataBlob) {
+                const fileName = await createImageFileName(
+                  filesTargetLocation,
+                  src.split(".")[src.split(".").length - 1]
+                );
+                const tfileObject = await createTFileObject(
+                  fileName,
+                  await getBlobArrayBuffer(dataBlob),
+                  this.app
+                );
+
+                // const dataURL: string = await new Promise((resolve, reject) => {
+                //   const urlReader = new FileReader();
+                //   urlReader.readAsDataURL(dataBlob);
+                //   urlReader.onload = () => {
+                //     const b64 = urlReader.result;
+                //     resolve(b64.toString());
+                //   };
+                // });
+
+                srcContainingElements[i].setAttr(
+                  "src",
+                  encodeURI(tfileObject.path)
+                );
+              }
+            }
+          }
+
+          clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
+
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
           // we will switch to the equivalent Text mode:
@@ -301,12 +433,12 @@ export default class PastetoIndentationPlugin extends Plugin {
         // The length of `- ` / `* `, to accomodate a bullet list:
         const additionalLeadingWhitespace =
           leadingWhitespaceMatch !== null &&
-          leadingWhitespaceMatch[2] !== undefined
+            leadingWhitespaceMatch[2] !== undefined
             ? " ".repeat(
-                leadingWhitespaceMatch[2].length > 3
-                  ? 3
-                  : leadingWhitespaceMatch[2].length
-              )
+              leadingWhitespaceMatch[2].length > 3
+                ? 3
+                : leadingWhitespaceMatch[2].length
+            )
             : "";
 
         if (
@@ -333,7 +465,7 @@ export default class PastetoIndentationPlugin extends Plugin {
               await app.vault.createFolder(filesTargetLocation);
             }
 
-            await app.vault.adapter.writeBinary(
+            await app.vault.createBinary(
               imageFileName,
               base64ToArrayBuffer(image.groups.data)
             );
@@ -401,10 +533,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           if (this.settings.escapeCharactersInBlockquotes) {
             const charactersToEscape = [
               ...output.matchAll(
-                new RegExp(
-                  `[${escapeRegExp(blockquoteCharactersToEscape)}]`,
-                  "g"
-                )
+                new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g")
               ),
             ]
               .map((x) => x.index)
@@ -634,7 +763,7 @@ class SettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Paste to Current Indentation" });
+    containerEl.createEl("h2", { text: "Paste Mode" });
 
     if (!this.plugin.clipboardReadWorks) {
       const noticeDiv = containerEl.createDiv();
@@ -678,7 +807,7 @@ class SettingTab extends PluginSettingTab {
         toggle
           .setValue(
             this.plugin.settings.saveBase64EncodedFiles ||
-              DEFAULT_SETTINGS.saveBase64EncodedFiles
+            DEFAULT_SETTINGS.saveBase64EncodedFiles
           )
           .onChange(async (value) => {
             this.plugin.settings.saveBase64EncodedFiles = value;
@@ -710,16 +839,56 @@ class SettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Escape characters in blockquotes")
       .setDesc(
-        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of "${blockquoteCharactersToEscape}" characters.`
+        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of specific characters.`
       )
       .addToggle((toggle) => {
         toggle
           .setValue(
             this.plugin.settings.escapeCharactersInBlockquotes ||
-              DEFAULT_SETTINGS.escapeCharactersInBlockquotes
+            DEFAULT_SETTINGS.escapeCharactersInBlockquotes
           )
           .onChange(async (value) => {
             this.plugin.settings.escapeCharactersInBlockquotes = value;
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Escape characters regex")
+      .setDesc(
+        `A Regular Expression expressing which characters to escape when pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode.`
+      )
+      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.blockquoteEscapeCharactersRegex ||
+            defaultBlockquoteEscapeCharacters
+          )
+          .setPlaceholder(defaultBlockquoteEscapeCharacters)
+          .onChange(async (value) => {
+            this.plugin.settings.blockquoteEscapeCharactersRegex =
+              value || defaultBlockquoteEscapeCharacters;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("src attribute copy regex")
+      .setDesc(
+        `If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.`
+      )
+      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.srcAttributeCopyRegex ||
+            defaultSrcAttributeCopyRegex
+          )
+          .onChange(async (value) => {
+            this.plugin.settings.srcAttributeCopyRegex =
+              value || defaultSrcAttributeCopyRegex;
             await this.plugin.saveSettings();
           });
       });
@@ -739,7 +908,7 @@ class SettingTab extends PluginSettingTab {
         text
           .setValue(
             this.plugin.settings.saveFilesLocation ||
-              DEFAULT_SETTINGS.saveFilesLocation
+            DEFAULT_SETTINGS.saveFilesLocation
           )
           .onChange(async (value) => {
             this.plugin.settings.saveFilesLocation = value;
@@ -829,8 +998,7 @@ class SettingTab extends PluginSettingTab {
               attachmentLocationEl.addClass("primed");
 
               new Notice(
-                `Click again to delete attachmentLocation ${
-                  attachmentLocationIndex + 1
+                `Click again to delete attachmentLocation ${attachmentLocationIndex + 1
                 }`
               );
             });

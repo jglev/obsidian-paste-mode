@@ -12,3 +12,6 @@ main.js
 
 # obsidian
 data.json
+
+# For the Obsidian hotreload plugin:
+.hotreload
