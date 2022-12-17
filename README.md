@@ -1,10 +1,12 @@
-## Obsidian Paste to Current Indentation Plugin
+## Obsidian Paste Mode
 
 An [Obsidian](https://obsidian.md/) plugin to paste and manage text, including block quotes, that are indented. This plugin helps especially with embedding code, quotes, and other content within lists.
 
+_(This plugin was formerly titled "Paste to Current Indentation".)
+
 ### "Paste modes"
 
-Paste to Current Indentation takes over the paste functionality within Obsidian. It has eight "paste modes," which determine what happens when one pastes text within a file in Obsidian. **All of the below will honor the cursor's current indentation when pasting, except for "Passthrough" mode, which uses Obsidian's default paste functionality.**
+Paste Mode takes over the paste functionality within Obsidian. It has eight "paste modes," which determine what happens when one pastes text within a file in Obsidian. **All of the below will honor the cursor's current indentation when pasting, except for "Passthrough" mode, which uses Obsidian's default paste functionality.**
 
 ![Demonstration of paste modes](img/all-paste-modes.gif)
 
@@ -25,10 +27,10 @@ The current paste mode is displayed in Obsidian's Status Bar:
 There are multiple ways to switch paste modes:
 
 1. Clicking the status bar paste mode display will bring up a searchable menu with which you can select a new mode.
-1. Open the Command Palette and search for `Paste to Current Indentation: Cycle Paste Mode`. This command is equivalent to clicking the satus bar.
-1. Open the Command Palette and search for `Paste to Current Indentation: Set Paste Mode`. One command per paste mode is provided.
+1. Open the Command Palette and search for `Paste Mode: Cycle Paste Mode`. This command is equivalent to clicking the satus bar.
+1. Open the Command Palette and search for `Paste Mode: Set Paste Mode`. One command per paste mode is provided.
   - These commands could be used, e.g., with the Obsidian [Quick Add plugin](https://github.com/chhoumann/quickadd/blob/master/docs/Choices/MacroChoice.md) to assign a keyboard command for switching to a given mode and then pasting.
-1. Open the Command Palette and search for `Paste to Current Indentation: Cycle Paste Mode`. This command will cycle through the different paste modes (i.e., from Text mode to Text Blockquote mode, to Markdown mode, to Markdown Blockquote mode, to Passthrough mode, back to Text mode, etc.)
+1. Open the Command Palette and search for `Paste Mode: Cycle Paste Mode`. This command will cycle through the different paste modes (i.e., from Text mode to Text Blockquote mode, to Markdown mode, to Markdown Blockquote mode, to Passthrough mode, back to Text mode, etc.)
 1. Within the plugin's Settings page.
 
 #### Limitations of Paste Modes
@@ -39,7 +41,7 @@ There are multiple ways to switch paste modes:
 
 ### Additional commands
 
-- Within the Command Palette, the `Paste to Current Indentation: Toggle blockquote at current indentation` command will toggle blockquote markers at the highlighted text's current level of indentation. 
+- Within the Command Palette, the `Paste Mode: Toggle blockquote at current indentation` command will toggle blockquote markers at the highlighted text's current level of indentation. 
 
 ![Toggle blockquote command](img/toggle-blockquote.gif)
 

@@ -51,7 +51,7 @@ const createTFileObject = async (
   // here:
   if (tfileObject === null) {
     console.log(
-      "Paste to Current Indentation: Waiting for pasted file to become available..."
+      "Paste Mode: Waiting for pasted file to become available..."
     );
     // Wait for the Obsidian metadata cache to catch up to the
     // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
@@ -61,12 +61,12 @@ const createTFileObject = async (
     tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
     while (!tfileObject && nFileTries < 30) {
       console.log(
-        `Paste to Current Indentation: Waiting for pasted file to become available... (attempt ${nFileTries + 1
+        `Paste Mode: Waiting for pasted file to become available... (attempt ${nFileTries + 1
         })`
       );
       if (nFileTries === 10) {
         new Notice(
-          `Paste to Current Indentation: Waiting for pasted file to become available...`
+          `Paste Mode: Waiting for pasted file to become available...`
         );
       }
 
@@ -763,7 +763,7 @@ class SettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Paste to Current Indentation" });
+    containerEl.createEl("h2", { text: "Paste Mode" });
 
     if (!this.plugin.clipboardReadWorks) {
       const noticeDiv = containerEl.createDiv();
