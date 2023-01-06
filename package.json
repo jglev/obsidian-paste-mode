@@ -1,6 +1,6 @@
 {
   "name": "obsidian-paste-to-current-indentation",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "This plugin allows pasting and marking text as block-quotes at any level of indentation.",
   "main": "main.js",
   "scripts": {

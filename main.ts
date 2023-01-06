@@ -354,11 +354,7 @@ export default class PastetoIndentationPlugin extends Plugin {
               // file:
               // !new RegExp("^([a-zA-Z])+://").test(src);
               if (srcIsLocalFile) {
-                let urlForDownloading = src;
-
-                if (src.startsWith("file:///")) {
-                  urlForDownloading = src.replace(/^file:\/\/\//, "");
-                }
+                const urlForDownloading = src.replace(/^file:\/{2,3}/, "");
 
                 dataBlob = new Blob([
                   await FileSystemAdapter.readLocalFile(urlForDownloading),
