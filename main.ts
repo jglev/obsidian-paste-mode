@@ -270,7 +270,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         const activeFile = this.app.workspace.getActiveFile();
         const activeFilePath = activeFile?.path;
 
-        let filesTargetLocation = this.settings.saveFilesLocation;
+        let filesTargetLocation = this.settings.saveFilesLocation.replace('{current}', activeFile.parent.path);
         let longestMatchingCursorFilePattern = 0;
         this.settings.saveFilesOverrideLocations.forEach((location) => {
           if (
@@ -910,7 +910,7 @@ class SettingTab extends PluginSettingTab {
     new Setting(attachmentsEl)
       .setName("Default attachment folder path")
       .setDesc(
-        `When saving files from the clipboard, place them in this folder.`
+        `When saving files from the clipboard, place them in this folder. ("{current}" will insert the directory of the currently-open note.)`
       )
       .addText((text) => {
         text
