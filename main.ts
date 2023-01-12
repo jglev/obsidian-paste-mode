@@ -268,15 +268,17 @@ export default class PastetoIndentationPlugin extends Plugin {
         const files = evt.clipboardData.files;
         const fileLinks = [];
         const activeFile = this.app.workspace.getActiveFile();
+        const activeFilePath = activeFile?.path;
 
-        let filesTargetLocation = this.settings.saveFilesLocation;
+        let filesTargetLocation = this.settings.saveFilesLocation.replace('{current}', activeFile.parent.path);
         let longestMatchingCursorFilePattern = 0;
         this.settings.saveFilesOverrideLocations.forEach((location) => {
           if (
-            activeFile.path.startsWith(location.cursorFilePattern) &&
+            activeFilePath &&
+            activeFilePath.startsWith(location.cursorFilePattern) &&
             location.cursorFilePattern.length > longestMatchingCursorFilePattern
           ) {
-            filesTargetLocation = location.targetLocation;
+            filesTargetLocation = location.targetLocation.replace('{current}', activeFile.parent.path);
             longestMatchingCursorFilePattern =
               location.cursorFilePattern.length;
           }
@@ -308,7 +310,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
           const link = this.app.fileManager.generateMarkdownLink(
             tfileObject,
-            this.app.workspace.getActiveFile().path
+            activeFilePath
           );
 
           fileLinks.push(link);
@@ -319,6 +321,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
           const parser = new DOMParser();
           const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
+
           // Find all elements with a src attribute:
           const srcContainingElements = htmlDom.querySelectorAll("[src]");
 
@@ -354,10 +357,12 @@ export default class PastetoIndentationPlugin extends Plugin {
               // file:
               // !new RegExp("^([a-zA-Z])+://").test(src);
               if (srcIsLocalFile) {
-                let urlForDownloading = src;
+                let urlForDownloading = src.replace(/^file:\/{2}/, "");
 
-                if (src.startsWith("file:///")) {
-                  urlForDownloading = src.replace(/^file:\/\/\//, "");
+                if (/^\/[A-Za-z]:/.test(urlForDownloading)) {
+                  // We are likely in Windows, and need to remove an additional
+                  // slash from the URL:
+                  urlForDownloading = urlForDownloading.replace(/^\//, '');
                 }
 
                 dataBlob = new Blob([
@@ -370,6 +375,10 @@ export default class PastetoIndentationPlugin extends Plugin {
                   .then(async (blob) => {
                     dataBlob = blob;
                   });
+              }
+
+              if (!(await app.vault.adapter.exists(filesTargetLocation))) {
+                await app.vault.createFolder(filesTargetLocation);
               }
 
               if (dataBlob) {
@@ -769,12 +778,12 @@ class SettingTab extends PluginSettingTab {
       const noticeDiv = containerEl.createDiv();
       noticeDiv
         .createEl("span", { text: "Notice: " })
-        .addClass("paste-to-current-indentation-settings-notice");
+        .addClass("paste-mode-settings-notice");
       noticeDiv
         .createEl("span", {
           text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentOverrideLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
         })
-        .addClass("paste-to-current-indentation-settings-notice-text");
+        .addClass("paste-mode-settings-notice-text");
     }
 
     new Setting(containerEl)
@@ -878,8 +887,7 @@ class SettingTab extends PluginSettingTab {
       .setName("src attribute copy regex")
       .setDesc(
         `If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.`
-      )
-      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
+    )
       .addText((text) => {
         text
           .setValue(
@@ -902,7 +910,7 @@ class SettingTab extends PluginSettingTab {
     new Setting(attachmentsEl)
       .setName("Default attachment folder path")
       .setDesc(
-        `When saving files from the clipboard, place them in this folder.`
+        `When saving files from the clipboard, place them in this folder. ("{current}" will insert the directory of the currently-open note.)`
       )
       .addText((text) => {
         text
@@ -953,7 +961,7 @@ class SettingTab extends PluginSettingTab {
 
       new Setting(attachmentLocationEl)
         .setName("Saved file target location")
-        .setDesc("...Save a pasted file into this directory:")
+        .setDesc('...Save a pasted file into this directory. ("{current}" will insert the directory of the currently-open note.)')
         .addText((text) => {
           text
             .setValue(attachmentLocation.targetLocation)
@@ -970,7 +978,7 @@ class SettingTab extends PluginSettingTab {
         .addButton((button) => {
           button
             .setButtonText("Delete")
-            .setClass("paste-to-current-indentation-settings-delete-button")
+            .setClass("paste-mode-settings-delete-button")
             .setTooltip("Delete override location")
             .onClick(async () => {
               if (attachmentLocationDeletePrimerTimer) {

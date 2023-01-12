@@ -1,13 +1,13 @@
-.paste-to-current-indentation-settings-notice {
+.paste-mode-settings-notice {
   color: var(--text-error);
   font-weight: bold;
 }
 
-.paste-to-current-indentation-settings-notice-text {
+.paste-mode-settings-notice-text {
   font-style: italic;
 }
 
-.primed .paste-to-current-indentation-settings-delete-button {
+.primed .paste-mode-settings-delete-button {
   background: var(--text-error) !important;
   color: white !important;
 }

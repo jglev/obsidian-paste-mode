@@ -1,8 +1,8 @@
 {
   "id": "obsidian-paste-to-current-indentation",
   "name": "Paste Mode",
-  "version": "5.0.0",
-  "minAppVersion": "1.0.0",
+  "version": "5.0.1",
+  "minAppVersion": "1.1.1",
   "description": "Paste content and mark block quotes at any level of indentation.",
   "author": "Jacob Levernier",
   "authorUrl": "https://github.com/jglev/obsidian-paste-to-current-indentation",
