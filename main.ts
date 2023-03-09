@@ -409,7 +409,7 @@ export default class PastetoIndentationPlugin extends Plugin {
             }
           }
 
-          clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
+          clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML).replaceAll('\n', ' ');
 
           // htmlToMarkdown() will return a blank string if
           // there is no HTML to convert. If that is the case,
