@@ -357,7 +357,7 @@ export default class PastetoIndentationPlugin extends Plugin {
               // file:
               // !new RegExp("^([a-zA-Z])+://").test(src);
               if (srcIsLocalFile) {
-                let urlForDownloading = src.replace(/^file:\/{2}/, "");
+                let urlForDownloading = decodeURI(src).replace(/^file:\/{2}/, "");
 
                 if (/^\/[A-Za-z]:/.test(urlForDownloading)) {
                   // We are likely in Windows, and need to remove an additional
@@ -405,6 +405,11 @@ export default class PastetoIndentationPlugin extends Plugin {
                   "src",
                   encodeURI(tfileObject.path)
                 );
+
+                srcContainingElements[i].setAttr(
+                  "alt",
+                  srcContainingElements[i].getAttr('src').replaceAll('\n', ' ')
+                )
               }
             }
           }
