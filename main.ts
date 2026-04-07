@@ -38,6 +38,33 @@ enum Mode {
   Passthrough = "Passthrough",
 }
 
+const StatusBarLabel: Record<Mode, string> = {
+  [Mode.Text]: "TXT",
+  [Mode.TextBlockquote]: "TXT (BQ)",
+  [Mode.Markdown]: "MD",
+  [Mode.MarkdownBlockquote]: "MD (BQ)",
+  [Mode.CodeBlock]: "CODE",
+  [Mode.CodeBlockBlockquote]: "CODE (BQ)",
+  [Mode.Passthrough]: "Default",
+};
+
+const updateStatusBar = (
+  statusBar: HTMLElement,
+  mode: Mode,
+  displayMode: string
+) => {
+  if (displayMode === "hidden") {
+    statusBar.style.display = "none";
+  } else {
+    statusBar.style.display = "";
+    if (displayMode === "shortened") {
+      statusBar.textContent = "PM: " + (StatusBarLabel[mode] || mode);
+    } else {
+      statusBar.textContent = "Paste Mode: " + mode;
+    }
+  }
+};
+
 const createTFileObject = async (
   fileName: string,
   arrayBuffer: ArrayBuffer,
@@ -201,6 +228,7 @@ interface PastetoIndentationPluginSettings {
   escapeCharactersInBlockquotes: boolean;
   blockquoteEscapeCharactersRegex: string;
   srcAttributeCopyRegex: string;
+  statusBarDisplay: string;
 }
 
 const defaultBlockquoteEscapeCharacters = "(==|<)";
@@ -209,6 +237,7 @@ const defaultSrcAttributeCopyRegex = "";
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
+  statusBarDisplay: "original",
   saveBase64EncodedFiles: false,
   saveFilesLocation: "Attachments",
   saveFilesOverrideLocations: [],
@@ -236,7 +265,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     const changePasteMode = async (value: Mode) => {
       this.settings.mode = value;
       await this.saveSettings();
-      this.statusBar.setText(`Paste Mode: ${value}`);
+      updateStatusBar(this.statusBar, value, this.settings.statusBarDisplay);
     };
 
     this.addSettingTab(new SettingTab(this.app, this));
@@ -731,7 +760,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     });
 
     this.statusBar = this.addStatusBarItem();
-    this.statusBar.setText(`Paste Mode: ${this.settings.mode}`);
+    updateStatusBar(this.statusBar, this.settings.mode, this.settings.statusBarDisplay);
     const onChooseItem = async (item: number): Promise<void> => {
       const selection = Object.values(Mode)[item];
       await changePasteMode(selection);
@@ -806,9 +835,25 @@ class SettingTab extends PluginSettingTab {
             this.plugin.settings.mode =
               (value as Mode) || DEFAULT_SETTINGS.mode;
             await this.plugin.saveSettings();
-            this.plugin.statusBar.setText(
-              `Paste Mode: ${this.plugin.settings.mode}`
-            );
+            updateStatusBar(this.plugin.statusBar, this.plugin.settings.mode, this.plugin.settings.statusBarDisplay);
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Status bar display")
+      .setDesc(
+        "How to display the current paste mode in the status bar."
+      )
+      .addDropdown((dropdown: any) =>
+        dropdown
+          .addOption("original", "Original (Paste Mode: ...)")
+          .addOption("shortened", "Shortened (PM: ...)")
+          .addOption("hidden", "Hidden")
+          .setValue(this.plugin.settings.statusBarDisplay || DEFAULT_SETTINGS.statusBarDisplay)
+          .onChange(async (value: string) => {
+            this.plugin.settings.statusBarDisplay = value;
+            await this.plugin.saveSettings();
+            updateStatusBar(this.plugin.statusBar, this.plugin.settings.mode, value);
           })
       );
 
