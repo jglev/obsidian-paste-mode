@@ -1,7 +1,5 @@
-import cloneDeep from "lodash.clonedeep";
 import {
   addIcon,
-  apiVersion,
   App,
   base64ToArrayBuffer,
   getBlobArrayBuffer,
@@ -19,12 +17,9 @@ import {
 } from "obsidian";
 
 import {
-  escapeRegExp,
   toggleQuote,
   toggleQuoteInEditor,
 } from "./src/toggle-quote";
-
-const moment = require("moment");
 
 import * as pluginIcons from "./icons.json";
 
@@ -37,6 +32,18 @@ enum Mode {
   CodeBlockBlockquote = "Code Block (Blockquote)",
   Passthrough = "Passthrough",
 }
+
+const MODE_VALUES = Object.values(Mode);
+const MODE_ENTRIES = Object.entries(Mode);
+
+const CURRENT_FILE_PLACEHOLDER = "{current}";
+
+const LEADING_WHITESPACE_REGEX = /^(\s*)(.*)/;
+
+const timestamp = () => {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
+};
 
 const createTFileObject = async (
   fileName: string,
@@ -58,12 +65,12 @@ const createTFileObject = async (
     // there is currently no way to force a metadata cache refresh,
     // unfortunately.
     let nFileTries = 0;
-    tfileObject = app.metadataCache.getFirstLinkpathDest(fileName, "");
     while (!tfileObject && nFileTries < 30) {
-      console.log(
-        `Paste Mode: Waiting for pasted file to become available... (attempt ${nFileTries + 1
-        })`
-      );
+      if (nFileTries > 0) {
+        console.log(
+          `Paste Mode: Waiting for pasted file to become available... (attempt ${nFileTries + 1})`
+        );
+      }
       if (nFileTries === 10) {
         new Notice(
           `Paste Mode: Waiting for pasted file to become available...`
@@ -90,24 +97,18 @@ const createTFileObject = async (
 
 const createImageFileName = async (
   fileLocation: string,
-  extension: string
+  extension: string,
+  app: App
 ): Promise<string> => {
-  let imageFileName = `${fileLocation || "."}/Pasted image ${moment().format(
-    "YYYYMMDDHHmmss"
-  )}.${extension}`;
+  const ts = timestamp();
+  let imageFileName = `${fileLocation || "."}/Pasted image ${ts}.${extension}`;
 
-  // Address race condition whereby if multiple image files exist
-  // on the clipboard, they will all be saved to the same name:
   let imageFileNameIndex = 0;
-  let imageFileNameWithIndex = imageFileName;
-  while (await app.vault.adapter.exists(imageFileNameWithIndex)) {
-    imageFileNameWithIndex = `${fileLocation || "."
-      }/Pasted image ${moment().format(
-        "YYYYMMDDHHmmss"
-      )}_${imageFileNameIndex}.${extension}`;
+  while (await app.vault.adapter.exists(imageFileName)) {
+    imageFileName = `${fileLocation || "."
+      }/Pasted image ${ts}_${imageFileNameIndex}.${extension}`;
     imageFileNameIndex += 1;
   }
-  imageFileName = imageFileNameWithIndex;
 
   return imageFileName;
 };
@@ -162,27 +163,24 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 
   getItems(): number[] {
-    const filteredModes = Object.keys(Mode)
-      .map((key, index) => {
-        if (
-          (this.showPassthroughMode &&
-            Object.values(Mode)[index] === Mode.Passthrough) ||
-          (Object.values(Mode)[index] !== Mode.Passthrough &&
-            ((Object.values(Mode)[index] !== Mode.Markdown &&
-              Object.values(Mode)[index] !== Mode.MarkdownBlockquote) ||
-              this.clipboardReadWorks === true))
-        ) {
-          return index;
-        } else {
-          return null;
-        }
-      })
-      .filter((originalIndex) => originalIndex !== null);
-    return filteredModes;
+    const results: number[] = [];
+    MODE_VALUES.forEach((mode, index) => {
+      if (mode === Mode.Passthrough && !this.showPassthroughMode) {
+        return;
+      }
+      if (
+        (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) &&
+        !this.clipboardReadWorks
+      ) {
+        return;
+      }
+      results.push(index);
+    });
+    return results;
   }
 
   getItemText(index: number): string {
-    return Object.values(Mode)[index];
+    return MODE_VALUES[index];
   }
 }
 
@@ -197,7 +195,6 @@ interface PastetoIndentationPluginSettings {
   saveBase64EncodedFiles: boolean;
   saveFilesLocation: string;
   saveFilesOverrideLocations: AttachmentLocation[];
-  apiVersion: number;
   escapeCharactersInBlockquotes: boolean;
   blockquoteEscapeCharactersRegex: string;
   srcAttributeCopyRegex: string;
@@ -212,7 +209,6 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   saveBase64EncodedFiles: false,
   saveFilesLocation: "Attachments",
   saveFilesOverrideLocations: [],
-  apiVersion: 5,
   escapeCharactersInBlockquotes: false,
   blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
   srcAttributeCopyRegex: defaultSrcAttributeCopyRegex,
@@ -241,346 +237,301 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addSettingTab(new SettingTab(this.app, this));
 
-    this.app.workspace.on(
-      "editor-paste",
-      async (evt: ClipboardEvent, editor: Editor) => {
-        // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
-        // "Check for `evt.defaultPrevented` before attempting to handle this
-        // event, and return if it has been already handled."
-        if (evt.defaultPrevented) {
-          return;
-        }
-
-        let mode = this.settings.mode;
-
-        if (mode === Mode.Passthrough) {
-          return;
-        }
-        evt.preventDefault();
-
-        let clipboardContents = "";
-        let output = "";
-
-        // TODO: Add setting here.
-        // if (evt.clipboardData.types.every((type) => type === "files")) {
-        //   return;
-        // }
-        const files = evt.clipboardData.files;
-        const fileLinks = [];
-        const activeFile = this.app.workspace.getActiveFile();
-        const activeFilePath = activeFile?.path;
-
-        let filesTargetLocation = this.settings.saveFilesLocation.replace('{current}', activeFile.parent.path);
-        let longestMatchingCursorFilePattern = 0;
-        this.settings.saveFilesOverrideLocations.forEach((location) => {
-          if (
-            activeFilePath &&
-            activeFilePath.startsWith(location.cursorFilePattern) &&
-            location.cursorFilePattern.length > longestMatchingCursorFilePattern
-          ) {
-            filesTargetLocation = location.targetLocation.replace('{current}', activeFile.parent.path);
-            longestMatchingCursorFilePattern =
-              location.cursorFilePattern.length;
-          }
-        });
-
-        if (files.length) {
-          if (!(await app.vault.adapter.exists(filesTargetLocation))) {
-            await app.vault.createFolder(filesTargetLocation);
-          }
-        }
-
-        for (var i = 0; i < files.length; i++) {
-          const fileObject = files[i];
-
-          const fileName = await createImageFileName(
-            filesTargetLocation,
-            fileObject.type.split("/")[1]
-          );
-
-          const tfileObject = await createTFileObject(
-            fileName,
-            await fileObject.arrayBuffer(),
-            app
-          );
-
-          if (tfileObject === undefined) {
-            continue;
+    this.registerEvent(
+      this.app.workspace.on(
+        "editor-paste",
+        async (evt: ClipboardEvent, editor: Editor) => {
+          // Per https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3690,
+          // "Check for `evt.defaultPrevented` before attempting to handle this
+          // event, and return if it has been already handled."
+          if (evt.defaultPrevented) {
+            return;
           }
 
-          const link = this.app.fileManager.generateMarkdownLink(
-            tfileObject,
-            activeFilePath
-          );
+          let mode = this.settings.mode;
 
-          // Prepend ! to image links so they display as images
-          const imageLink = fileObject.type.startsWith("image/") ? `!${link}` : link;
+          if (mode === Mode.Passthrough) {
+            return;
+          }
 
-          fileLinks.push(imageLink);
-        }
+          evt.preventDefault();
 
-        if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
-          let clipboardHtml = evt.clipboardData.getData("text/html");
+          const app = this.app;
 
-          const parser = new DOMParser();
-          const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
+          const ensureFolder = async (location: string) => {
+            if (!(await app.vault.adapter.exists(location))) {
+              await app.vault.createFolder(location);
+            }
+          };
 
-          // Find all elements with a src attribute:
-          const srcContainingElements = htmlDom.querySelectorAll("[src]");
+          const resolveLocation = (template: string) =>
+            template.replace(CURRENT_FILE_PLACEHOLDER, activeFile.parent.path);
 
-          for (const [i, el] of srcContainingElements.entries()) {
-            const src = el.getAttr("src");
+          let clipboardContents = "";
+          let output = "";
+
+          const files = evt.clipboardData.files;
+          const fileLinks: string[] = [];
+          const activeFile = app.workspace.getActiveFile();
+          const activeFilePath = activeFile?.path;
+
+          let filesTargetLocation = resolveLocation(this.settings.saveFilesLocation);
+          let longestMatchingCursorFilePattern = 0;
+          this.settings.saveFilesOverrideLocations.forEach((location) => {
             if (
-              this.settings.srcAttributeCopyRegex &&
-              new RegExp(this.settings.srcAttributeCopyRegex).test(src)
+              activeFilePath &&
+              activeFilePath.startsWith(location.cursorFilePattern) &&
+              location.cursorFilePattern.length > longestMatchingCursorFilePattern
             ) {
-              let dataBlob: Blob;
-              // If src starts with 'file://', we won't be able to get it using
-              // fetch(), as it's on the local filesystem. In that case, we'll
-              // need to use Obsidian's Node fs adapter:
+              filesTargetLocation = resolveLocation(location.targetLocation);
+              longestMatchingCursorFilePattern =
+                location.cursorFilePattern.length;
+            }
+          });
 
-              if (src.startsWith("app://obsidian.md")) {
-                // We're dealing with a relative src path, which then got
-                // prepended with app://obsidian.md. Thus, we won't be able
-                // to handle it:
-                // urlForDownloading = src.replace(
-                //   /^app:\/\/obsidian.md/,
-                //   // @ts-ignore
-                //   this.app.vault.adapter.basePath
-                // );
+          if (files.length) {
+            await ensureFolder(filesTargetLocation);
+          }
 
+          for (const fileObject of files) {
+            const fileName = await createImageFileName(
+              filesTargetLocation,
+              fileObject.type.split("/")[1],
+              app
+            );
+
+            const tfileObject = await createTFileObject(
+              fileName,
+              await fileObject.arrayBuffer(),
+              app
+            );
+
+            if (!tfileObject) {
+              continue;
+            }
+
+            const link = this.app.fileManager.generateMarkdownLink(
+              tfileObject,
+              activeFilePath
+            );
+
+            // Prepend ! to image links so they display as images
+            const imageLink = fileObject.type.startsWith("image/") ? `!${link}` : link;
+
+            fileLinks.push(imageLink);
+          }
+
+          if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
+            const clipboardHtml = evt.clipboardData.getData("text/html");
+
+            const parser = new DOMParser();
+            const htmlDom = parser.parseFromString(clipboardHtml, "text/html");
+
+            // Find all elements with a src attribute:
+            const srcContainingElements = htmlDom.querySelectorAll("[src]");
+            const srcRegex = this.settings.srcAttributeCopyRegex
+              ? new RegExp(this.settings.srcAttributeCopyRegex)
+              : null;
+
+            for (const [i, el] of srcContainingElements.entries()) {
+              const src = el.getAttr("src");
+              if (!srcRegex || !srcRegex.test(src)) {
                 continue;
               }
 
-              const srcIsLocalFile = src.startsWith("file://"); // ||
-              // src.startsWith("app://obsidian.md") ||
+              let dataBlob: Blob | undefined;
 
-              // We want to avoid CORS errors from downloading from localhost,
-              // and so will use the readLocalFile() method for any local
-              // file:
-              // !new RegExp("^([a-zA-Z])+://").test(src);
-              if (srcIsLocalFile) {
+              // app://obsidian.md URLs are relative paths prepended by Obsidian;
+              // we cannot resolve them, so skip.
+              if (src.startsWith("app://obsidian.md")) {
+                continue;
+              }
+
+              if (src.startsWith("file://")) {
                 let urlForDownloading = decodeURI(src).replace(/^file:\/{2}/, "");
 
                 if (/^\/[A-Za-z]:/.test(urlForDownloading)) {
-                  // We are likely in Windows, and need to remove an additional
-                  // slash from the URL:
+                  // Windows: remove extra leading slash
                   urlForDownloading = urlForDownloading.replace(/^\//, '');
                 }
 
                 dataBlob = new Blob([
                   await FileSystemAdapter.readLocalFile(urlForDownloading),
                 ]);
-
               } else {
-                await fetch(src, {})
-                  .then(async (response) => await response.blob())
-                  .then(async (blob) => {
-                    dataBlob = blob;
-                  });
+                dataBlob = await (await fetch(src)).blob();
               }
 
-              if (!(await app.vault.adapter.exists(filesTargetLocation))) {
-                await app.vault.createFolder(filesTargetLocation);
+              if (!dataBlob) {
+                continue;
               }
 
-              if (dataBlob) {
-                const fileName = await createImageFileName(
-                  filesTargetLocation,
-                  src.split(".")[src.split(".").length - 1]
-                );
-                const tfileObject = await createTFileObject(
-                  fileName,
-                  await getBlobArrayBuffer(dataBlob),
-                  this.app
-                );
+              await ensureFolder(filesTargetLocation);
 
-                // const dataURL: string = await new Promise((resolve, reject) => {
-                //   const urlReader = new FileReader();
-                //   urlReader.readAsDataURL(dataBlob);
-                //   urlReader.onload = () => {
-                //     const b64 = urlReader.result;
-                //     resolve(b64.toString());
-                //   };
-                // });
-
-                srcContainingElements[i].setAttr(
-                  "src",
-                  encodeURI(tfileObject.path)
-                );
-
-                srcContainingElements[i].setAttr(
-                  "alt",
-                  srcContainingElements[i].getAttr('src').replaceAll('\n', ' ')
-                )
-              }
-            }
-          }
-
-          clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
-
-          // htmlToMarkdown() will return a blank string if
-          // there is no HTML to convert. If that is the case,
-          // we will switch to the equivalent Text mode:
-          if (clipboardContents === "") {
-            if (mode === Mode.Markdown) {
-              mode = Mode.Text;
-            }
-            if (mode === Mode.MarkdownBlockquote) {
-              mode = Mode.TextBlockquote;
-            }
-          }
-        }
-
-        if (
-          mode === Mode.Text ||
-          mode === Mode.TextBlockquote ||
-          mode === Mode.CodeBlock ||
-          mode === Mode.CodeBlockBlockquote
-        ) {
-          clipboardContents = evt.clipboardData.getData("text");
-        }
-
-        const leadingWhitespaceMatch = editor
-          .getLine(editor.getCursor().line)
-          .match(new RegExp(`^(\\s*)(.*)?`));
-        const leadingWhitespace =
-          leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
-
-        // The length of `- ` / `* `, to accomodate a bullet list:
-        const additionalLeadingWhitespace =
-          leadingWhitespaceMatch !== null &&
-            leadingWhitespaceMatch[2] !== undefined
-            ? " ".repeat(
-              leadingWhitespaceMatch[2].length > 3
-                ? 3
-                : leadingWhitespaceMatch[2].length
-            )
-            : "";
-
-        if (
-          this.settings.saveBase64EncodedFiles &&
-          mode !== Mode.CodeBlock &&
-          mode !== Mode.CodeBlockBlockquote
-        ) {
-          const images = [
-            ...clipboardContents.matchAll(
-              /data:image\/(?<extension>.*?);base64,\s*(?<data>[A-Za-z0-9\+\/]*)\b={0,2}/g
-            ),
-          ];
-
-          // We reverse images here in order that string
-          // changes not affect the accuracy of later images'
-          // indexes:
-          for (let image of images.reverse()) {
-            const imageFileName = await createImageFileName(
-              filesTargetLocation,
-              image.groups.extension
-            );
-
-            if (!(await app.vault.adapter.exists(filesTargetLocation))) {
-              await app.vault.createFolder(filesTargetLocation);
-            }
-
-            await app.vault.createBinary(
-              imageFileName,
-              base64ToArrayBuffer(image.groups.data)
-            );
-
-            clipboardContents =
-              clipboardContents.substring(0, image.index) +
-              `${encodeURI(imageFileName)}` +
-              clipboardContents.substring(
-                image.index + image[0].length,
-                clipboardContents.length
+              const fileName = await createImageFileName(
+                filesTargetLocation,
+                src.split(".").pop()!,
+                app
               );
+              const tfileObject = await createTFileObject(
+                fileName,
+                await getBlobArrayBuffer(dataBlob),
+                app
+              );
+
+              const encodedPath = encodeURI(tfileObject.path);
+              el.setAttr("src", encodedPath);
+              el.setAttr("alt", encodedPath.replaceAll('\n', ' '));
+            }
+
+            clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
+
+            // htmlToMarkdown() returns a blank string when there's
+            // no HTML to convert — fall back to the equivalent Text mode:
+            if (clipboardContents === "") {
+              mode = mode === Mode.Markdown ? Mode.Text : Mode.TextBlockquote;
+            }
           }
-        }
 
-        let input = [
-          ...(clipboardContents.split("\n").join("") !== ""
-            ? clipboardContents.split("\n")
-            : []),
-          ...fileLinks,
-        ].map((line, i) => {
-          if (i === 0) {
-            return line;
+          if (
+            mode === Mode.Text ||
+            mode === Mode.TextBlockquote ||
+            mode === Mode.CodeBlock ||
+            mode === Mode.CodeBlockBlockquote
+          ) {
+            clipboardContents = evt.clipboardData.getData("text");
           }
 
-          return leadingWhitespace + additionalLeadingWhitespace + line;
-        });
+          const leadingWhitespaceMatch = editor
+            .getLine(editor.getCursor().line)
+            .match(LEADING_WHITESPACE_REGEX);
+          const leadingWhitespace =
+            leadingWhitespaceMatch !== null ? leadingWhitespaceMatch[1] : "";
 
-        if (mode === Mode.Text || mode === Mode.Markdown) {
-          output = output + input.join("\n");
-        }
+          // Additional indent to accommodate bullet list markers like `- ` / `* `:
+          const additionalLeadingWhitespace =
+            leadingWhitespaceMatch !== null &&
+              leadingWhitespaceMatch[2] !== undefined
+              ? " ".repeat(Math.min(leadingWhitespaceMatch[2].length, 3))
+              : "";
 
-        if (mode === Mode.CodeBlock) {
-          output = `\`\`\`\n${leadingWhitespace}${input.join(
-            "\n"
-          )}\n${leadingWhitespace}\`\`\``;
-        }
-
-        if (mode === Mode.CodeBlockBlockquote) {
-          input = [
-            "```",
-            leadingWhitespace + input[0],
-            ...input.slice(1),
-            leadingWhitespace + "```",
-          ];
-        }
-
-        if (
-          mode === Mode.TextBlockquote ||
-          mode === Mode.MarkdownBlockquote ||
-          mode === Mode.CodeBlockBlockquote
-        ) {
-          const toggledText = await toggleQuote(
-            // We will remove leadingWhitespace from line 0 at the end.
-            // It's just here to calculate overall leading whitespace.
-            [leadingWhitespace + input[0], ...input.slice(1)],
-            this.settings.blockquotePrefix
-          );
-          toggledText.lines[0] = toggledText.lines[0].replace(
-            new RegExp(`^${leadingWhitespace}`),
-            ""
-          );
-
-          output = toggledText.lines.join("\n");
-
-          if (this.settings.escapeCharactersInBlockquotes) {
-            const charactersToEscape = [
-              ...output.matchAll(
-                new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g")
+          if (
+            this.settings.saveBase64EncodedFiles &&
+            mode !== Mode.CodeBlock &&
+            mode !== Mode.CodeBlockBlockquote
+          ) {
+            const images = [
+              ...clipboardContents.matchAll(
+                /data:image\/(?<extension>.*?);base64,\s*(?<data>[A-Za-z0-9\+\/]*)\b={0,2}/g
               ),
-            ]
-              .map((x) => x.index)
-              .reverse();
+            ];
 
-            charactersToEscape.forEach((index) => {
-              if (
-                output[Number(index) - 1] !== "\\" &&
-                !(
-                  output[Number(index) - 1] === "\\" &&
-                  output[Number(index) - 2] === "\\"
-                )
-              ) {
-                output =
-                  output.substring(0, index) + "\\" + output.substring(index);
-              }
-            });
+            // Reverse so string replacements don't invalidate later indices:
+            for (const image of images.reverse()) {
+              const imageFileName = await createImageFileName(
+                filesTargetLocation,
+                image.groups.extension,
+                app
+              );
+
+              await ensureFolder(filesTargetLocation);
+
+              await app.vault.createBinary(
+                imageFileName,
+                base64ToArrayBuffer(image.groups.data)
+              );
+
+              clipboardContents =
+                clipboardContents.substring(0, image.index) +
+                `${encodeURI(imageFileName)}` +
+                clipboardContents.substring(
+                  image.index + image[0].length,
+                  clipboardContents.length
+                );
+            }
           }
+
+          const clipboardLines = clipboardContents.split("\n");
+          const input = [
+            ...(clipboardLines.some((l) => l !== "") ? clipboardLines : []),
+            ...fileLinks,
+          ].map((line, i) => {
+            if (i === 0) {
+              return line;
+            }
+            return leadingWhitespace + additionalLeadingWhitespace + line;
+          });
+
+          if (mode === Mode.Text || mode === Mode.Markdown) {
+            output = input.join("\n");
+          }
+
+          if (mode === Mode.CodeBlock) {
+            output = `\`\`\`\n${leadingWhitespace}${input.join(
+              "\n"
+            )}\n${leadingWhitespace}\`\`\``;
+          }
+
+          if (mode === Mode.CodeBlockBlockquote) {
+            const fencedInput = [
+              "```",
+              leadingWhitespace + input[0],
+              ...input.slice(1),
+              leadingWhitespace + "```",
+            ];
+
+            const toggledText = toggleQuote(
+              fencedInput,
+              this.settings.blockquotePrefix
+            );
+            toggledText.lines[0] = toggledText.lines[0].replace(
+              new RegExp(`^${leadingWhitespace}`),
+              ""
+            );
+
+            output = toggledText.lines.join("\n");
+
+            if (this.settings.escapeCharactersInBlockquotes) {
+              output = this.escapeBlockquoteCharacters(output);
+            }
+
+            const transaction: EditorTransaction = {
+              replaceSelection: output,
+            };
+
+            editor.transaction(transaction);
+            return;
+          }
+
+          if (
+            mode === Mode.TextBlockquote ||
+            mode === Mode.MarkdownBlockquote
+          ) {
+            const toggledText = toggleQuote(
+              [leadingWhitespace + input[0], ...input.slice(1)],
+              this.settings.blockquotePrefix
+            );
+            toggledText.lines[0] = toggledText.lines[0].replace(
+              new RegExp(`^${leadingWhitespace}`),
+              ""
+            );
+
+            output = toggledText.lines.join("\n");
+
+            if (this.settings.escapeCharactersInBlockquotes) {
+              output = this.escapeBlockquoteCharacters(output);
+            }
+          }
+
+          const transaction: EditorTransaction = {
+            replaceSelection: output,
+          };
+
+          editor.transaction(transaction);
         }
+      ));
 
-        const transaction: EditorTransaction = {
-          replaceSelection: output,
-        };
-
-        editor.transaction(transaction);
-      }
-    );
-
-    Object.values(Mode).forEach((value, index) => {
-      const key = Object.keys(Mode)[index];
+    MODE_ENTRIES.forEach(([key, value]) => {
       this.addCommand({
         id: `set-paste-mode-${key}`,
         icon: `pasteIcons-${key}`,
@@ -624,57 +575,40 @@ export default class PastetoIndentationPlugin extends Plugin {
       changePasteMode(originalMode);
     };
 
-    Object.values(Mode).forEach((value, index) => {
-      // Passthrough seems not to work with this approach -- perhaps
-      // because event.isTrusted can't be set to true? (I'm unsure.)
-      if (value !== Mode.Passthrough) {
-        if (
-          (value !== Mode.Markdown && value !== Mode.MarkdownBlockquote) ||
-          this.clipboardReadWorks === true
-        ) {
-          const key = Object.keys(Mode)[index];
-
-          this.addCommand({
-            id: `paste-in-mode-${key}`,
-            icon: `pasteIcons-${key}-hourglass`,
-            name: `Paste in ${value} Mode`,
-            editorCallback: async (editor: Editor, view: MarkdownView) => {
-              await pasteInMode(value, editor, view);
-            },
-          });
-        }
+    MODE_ENTRIES.forEach(([key, value]) => {
+      // Passthrough doesn't work with synthetic clipboard events:
+      if (value === Mode.Passthrough) {
+        return;
       }
-    });
+      if (
+        (value === Mode.Markdown || value === Mode.MarkdownBlockquote) &&
+        !this.clipboardReadWorks
+      ) {
+        return;
+      }
 
-    Object.values(Mode).forEach((value) => {
       this.addCommand({
-        id: `cycle-paste-mode`,
-        icon: `pasteIcons-clipboard-cycle`,
-        name: `Cycle Paste Mode`,
-        callback: async () => {
-          const nextMode = (): Mode => {
-            const currentMode = this.settings.mode;
-            const modeValues = Object.values(Mode);
-            let newMode;
-            modeValues.forEach((value, index) => {
-              if (value === currentMode) {
-                if (index === modeValues.length - 1) {
-                  newMode = modeValues[0];
-                  return newMode;
-                }
-                newMode = modeValues[index + 1];
-                return newMode;
-              }
-            });
-            return newMode;
-          };
-
-          const newPasteMode = nextMode();
-
-          await changePasteMode(newPasteMode);
-          new Notice(`Paste mode changed to ${newPasteMode}`);
+        id: `paste-in-mode-${key}`,
+        icon: `pasteIcons-${key}-hourglass`,
+        name: `Paste in ${value} Mode`,
+        editorCallback: async (editor: Editor, view: MarkdownView) => {
+          await pasteInMode(value, editor, view);
         },
       });
+    });
+
+    this.addCommand({
+      id: `cycle-paste-mode`,
+      icon: `pasteIcons-clipboard-cycle`,
+      name: `Cycle Paste Mode`,
+      callback: async () => {
+        const currentIndex = MODE_VALUES.indexOf(this.settings.mode);
+        const nextIndex = (currentIndex + 1) % MODE_VALUES.length;
+        const newPasteMode = MODE_VALUES[nextIndex];
+
+        await changePasteMode(newPasteMode);
+        new Notice(`Paste mode changed to ${newPasteMode}`);
+      },
     });
 
     this.addCommand({
@@ -682,14 +616,14 @@ export default class PastetoIndentationPlugin extends Plugin {
       name: "Toggle blockquote at current indentation",
       icon: "pasteIcons-quote-text",
       checkCallback: (checking: boolean) => {
-        let view = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (view) {
-          if (!checking && view instanceof MarkdownView) {
-            toggleQuoteInEditor(view, this.settings.blockquotePrefix);
-          }
-          return true;
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view) {
+          return false;
         }
-        return false;
+        if (!checking) {
+          toggleQuoteInEditor(view, this.settings.blockquotePrefix);
+        }
+        return true;
       },
     });
 
@@ -765,6 +699,22 @@ export default class PastetoIndentationPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
+
+  escapeBlockquoteCharacters(output: string): string {
+    const regex = new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g");
+    const indices = [...output.matchAll(regex)]
+      .map((x) => x.index!)
+      .reverse();
+
+    for (const index of indices) {
+      // Don't add a backslash if one already precedes the character:
+      if (output[index - 1] !== "\\") {
+        output = output.substring(0, index) + "\\" + output.substring(index);
+      }
+    }
+
+    return output;
+  }
 }
 
 class SettingTab extends PluginSettingTab {
@@ -804,10 +754,9 @@ class SettingTab extends PluginSettingTab {
           .addOption(Mode.Markdown, "Markdown")
           .addOption(Mode.MarkdownBlockquote, "Markdown (Blockquote)")
           .addOption(Mode.Passthrough, "Passthrough")
-          .setValue(this.plugin.settings.mode || DEFAULT_SETTINGS.mode)
+          .setValue(this.plugin.settings.mode)
           .onChange(async (value) => {
-            this.plugin.settings.mode =
-              (value as Mode) || DEFAULT_SETTINGS.mode;
+            this.plugin.settings.mode = value as Mode;
             await this.plugin.saveSettings();
             this.plugin.statusBar.setText(
               `Paste Mode: ${this.plugin.settings.mode}`
@@ -822,10 +771,7 @@ class SettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) => {
         toggle
-          .setValue(
-            this.plugin.settings.saveBase64EncodedFiles ||
-            DEFAULT_SETTINGS.saveBase64EncodedFiles
-          )
+          .setValue(this.plugin.settings.saveBase64EncodedFiles)
           .onChange(async (value) => {
             this.plugin.settings.saveBase64EncodedFiles = value;
             await this.plugin.saveSettings();
@@ -860,10 +806,7 @@ class SettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) => {
         toggle
-          .setValue(
-            this.plugin.settings.escapeCharactersInBlockquotes ||
-            DEFAULT_SETTINGS.escapeCharactersInBlockquotes
-          )
+          .setValue(this.plugin.settings.escapeCharactersInBlockquotes)
           .onChange(async (value) => {
             this.plugin.settings.escapeCharactersInBlockquotes = value;
             await this.plugin.saveSettings();
@@ -895,7 +838,7 @@ class SettingTab extends PluginSettingTab {
       .setName("src attribute copy regex")
       .setDesc(
         `If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.`
-    )
+      )
       .addText((text) => {
         text
           .setValue(
@@ -922,10 +865,7 @@ class SettingTab extends PluginSettingTab {
       )
       .addText((text) => {
         text
-          .setValue(
-            this.plugin.settings.saveFilesLocation ||
-            DEFAULT_SETTINGS.saveFilesLocation
-          )
+          .setValue(this.plugin.settings.saveFilesLocation)
           .onChange(async (value) => {
             this.plugin.settings.saveFilesLocation = value;
             await this.plugin.saveSettings();
@@ -992,7 +932,7 @@ class SettingTab extends PluginSettingTab {
               if (attachmentLocationDeletePrimerTimer) {
                 clearTimeout(attachmentLocationDeletePrimerTimer);
               }
-              if (deleteAttachmentLocationPrimed === true) {
+              if (deleteAttachmentLocationPrimed) {
                 this.plugin.settings.saveFilesOverrideLocations.splice(
                   attachmentLocationIndex,
                   1

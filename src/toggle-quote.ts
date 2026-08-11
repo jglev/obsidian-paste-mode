@@ -1,7 +1,7 @@
 import { MarkdownView } from 'obsidian';
 
 // From https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions#escaping,
-// which, as a code snippet, is in the public domain, per 
+// which, as a code snippet, is in the public domain, per
 // https://developer.mozilla.org/en-US/docs/MDN/About#copyrights_and_licenses
 // (as of 2021-07-15):
 export const escapeRegExp = (string: string) => {
@@ -9,86 +9,75 @@ export const escapeRegExp = (string: string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
-export const toggleQuote = async (
+const LEADING_WHITESPACE_REGEX = /^(\s*)/;
+
+export const toggleQuote = (
   linesInput: string[],
   prefix: string
-): Promise<{
+): {
   lines: string[];
   minLeadingWhitespaceLength: number;
   isEveryLinePrefixed: boolean;
-}> => {
+} => {
   const fullLines = [...linesInput];
   const escapedPrefix = escapeRegExp(prefix);
 
   const leadingWhitespaces = fullLines.map((e: string) => {
-    const whitespaceMatch = e.match(new RegExp(`^(\\s*)`));
-    return whitespaceMatch !== null ? whitespaceMatch[1] : "";
+    const whitespaceMatch = e.match(LEADING_WHITESPACE_REGEX);
+    return whitespaceMatch?.[1] ?? "";
   });
-  // This is in its own variable to aid in debugging:
-  let filteredLeadingWhitespaces = leadingWhitespaces.filter(
-    (e: string, i: number) => {
-      // Get rid of blank lines, which might be part of multi-line
-      // passages:
-      return fullLines[i] !== "";
-    }
+
+  // Get rid of blank lines, which might be part of multi-line passages:
+  const nonBlankLeadingLengths = leadingWhitespaces
+    .filter((_e, i) => fullLines[i] !== "")
+    .map((e) => e.length);
+
+  // Account for if all lines actually *are* unindented:
+  const minLeadingWhitespaceLength = Math.min(
+    ...(nonBlankLeadingLengths.length > 0 ? nonBlankLeadingLengths : [0])
   );
-
-  // Account for if all lines actually *are* unindented, and we thus
-  // filtered all lines out immediately above:
-  const filteredLeadingLengths = (
-    filteredLeadingWhitespaces.length > 0 ? filteredLeadingWhitespaces : [""]
-  ).map((e: string) => e.length);
-  const minLeadingWhitespaceLength = Math.min(...filteredLeadingLengths);
-
-  // Determine whether *every* line is Prefixed or not. If not, we will
-  // add the prefix to every line; if so, we will remove it from every line.
-  const isEveryLinePrefixed = fullLines.every((e: string) => {
-    const prefixMatch = e.match(
-      new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
-    );
-    if (prefixMatch !== null) {
-      return true;
-    }
-    return false;
-  });
 
   // Make an educated guess about using tabs vs spaces (lacking access to the
-  // "Use Tabs" setting value in Obsidian for now) by just repurposing the
-  // first actual instance of leading whitespace:
-  const exampleLeadingWhitespace = leadingWhitespaces.filter(
+  // "Use Tabs" setting value in Obsidian for now) by repurposing the first
+  // actual instance of leading whitespace:
+  const exampleLeadingWhitespace = leadingWhitespaces.find(
     (e) => e.length === minLeadingWhitespaceLength
   );
+
+  const indentation =
+    exampleLeadingWhitespace && exampleLeadingWhitespace.length > 0
+      ? exampleLeadingWhitespace
+      : " ".repeat(minLeadingWhitespaceLength);
+
+  const prefixedLineRegex = new RegExp(
+    `^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`
+  );
+
+  // Determine whether *every* line is Prefixed or not:
+  const isEveryLinePrefixed = fullLines.every((e) => {
+    if (e === "") {
+      return true; // blank lines don't affect the decision
+    }
+    return e.match(prefixedLineRegex) !== null;
+  });
+
   // Update the text in-place:
   for (const [i, text] of fullLines.entries()) {
-    if (isEveryLinePrefixed === true) {
-      if (text === "") {
-        fullLines[i] =
-          exampleLeadingWhitespace.length > 0
-            ? exampleLeadingWhitespace[0]
-            : " ".repeat(minLeadingWhitespaceLength);
-        continue;
-      }
+    if (text === "") {
+      fullLines[i] = isEveryLinePrefixed ? indentation : indentation + prefix;
+      continue;
+    }
+
+    if (isEveryLinePrefixed) {
       fullLines[i] = text.replace(
-        new RegExp(`^(\\s{${minLeadingWhitespaceLength}})${escapedPrefix}`),
+        prefixedLineRegex,
         "$1"
       );
       continue;
     }
 
-    if (text === "") {
-      fullLines[i] =
-        (exampleLeadingWhitespace.length > 0
-          ? exampleLeadingWhitespace[0]
-          : " ".repeat(minLeadingWhitespaceLength)) + prefix;
-      continue;
-    }
-
     // If the prefix is already in the correct place, do not add to it:
-    if (
-      !text.match(
-        new RegExp(`^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`)
-      )
-    ) {
+    if (!text.match(prefixedLineRegex)) {
       fullLines[i] = text.replace(
         new RegExp(`^(\\s{${minLeadingWhitespaceLength}})`),
         `$1${prefix}`
@@ -98,8 +87,8 @@ export const toggleQuote = async (
 
   return {
     lines: fullLines,
-    minLeadingWhitespaceLength: minLeadingWhitespaceLength,
-    isEveryLinePrefixed: isEveryLinePrefixed,
+    minLeadingWhitespaceLength,
+    isEveryLinePrefixed,
   };
 };
 
@@ -124,7 +113,7 @@ export const toggleQuoteInEditor = async (
     .split("\n");
 
   const { lines, minLeadingWhitespaceLength, isEveryLinePrefixed } =
-    await toggleQuote(fullSelectedLines, prefix);
+    toggleQuote(fullSelectedLines, prefix);
 
   editor.replaceRange(
     lines.join("\n"),
@@ -132,36 +121,21 @@ export const toggleQuoteInEditor = async (
     replacementRange[1]
   );
 
-  let newSelectionStartCh;
-  if (currentSelectionStart.ch < minLeadingWhitespaceLength) {
-    newSelectionStartCh = currentSelectionStart.ch;
-  } else {
-    if (isEveryLinePrefixed) {
-      newSelectionStartCh = currentSelectionStart.ch - prefix.length;
-    } else {
-      newSelectionStartCh = currentSelectionStart.ch + prefix.length;
-    }
-  }
-
-  let newSelectionEndCh;
-  if (currentSelectionEnd.ch < minLeadingWhitespaceLength) {
-    newSelectionEndCh = currentSelectionEnd.ch;
-  } else {
-    if (isEveryLinePrefixed) {
-      newSelectionEndCh = currentSelectionEnd.ch - prefix.length;
-    } else {
-      newSelectionEndCh = currentSelectionEnd.ch + prefix.length;
-    }
-  }
+  const adjustedCh = (ch: number) =>
+    ch < minLeadingWhitespaceLength
+      ? ch
+      : isEveryLinePrefixed
+        ? ch - prefix.length
+        : ch + prefix.length;
 
   editor.setSelection(
     {
       line: currentSelectionStart.line,
-      ch: newSelectionStartCh,
+      ch: adjustedCh(currentSelectionStart.ch),
     },
     {
       line: currentSelectionEnd.line,
-      ch: newSelectionEndCh,
+      ch: adjustedCh(currentSelectionEnd.ch),
     }
   );
 };

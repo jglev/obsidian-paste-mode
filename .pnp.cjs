@@ -35,7 +35,6 @@ const RAW_RUNTIME_STATE =
           ["builtin-modules", "npm:5.3.0"],\
           ["esbuild", "npm:0.28.2"],\
           ["lodash.clonedeep", "npm:4.5.0"],\
-          ["moment", "npm:2.30.1"],\
           ["obsidian", "virtual:9fae5d4bad6a64625d206e60bcad4d69ccb96bc65564ae588cef3fb625d4dbda8e607af499849cb1308265212a5e2fd8172b5085573527b23840e009dd1b4160#npm:1.13.1"],\
           ["obsidian-paste-to-current-indentation", "workspace:."],\
           ["tslib", "npm:2.4.0"],\
@@ -573,13 +572,6 @@ const RAW_RUNTIME_STATE =
           ["moment", "npm:2.29.4"]\
         ],\
         "linkType": "HARD"\
-      }],\
-      ["npm:2.30.1", {\
-        "packageLocation": "../../../../.yarn/berry/cache/moment-npm-2.30.1-1c51a5c631-10c0.zip/node_modules/moment/",\
-        "packageDependencies": [\
-          ["moment", "npm:2.30.1"]\
-        ],\
-        "linkType": "HARD"\
       }]\
     ]],\
     ["obsidian", [\
@@ -621,7 +613,6 @@ const RAW_RUNTIME_STATE =
           ["builtin-modules", "npm:5.3.0"],\
           ["esbuild", "npm:0.28.2"],\
           ["lodash.clonedeep", "npm:4.5.0"],\
-          ["moment", "npm:2.30.1"],\
           ["obsidian", "virtual:9fae5d4bad6a64625d206e60bcad4d69ccb96bc65564ae588cef3fb625d4dbda8e607af499849cb1308265212a5e2fd8172b5085573527b23840e009dd1b4160#npm:1.13.1"],\
           ["obsidian-paste-to-current-indentation", "workspace:."],\
           ["tslib", "npm:2.4.0"],\
