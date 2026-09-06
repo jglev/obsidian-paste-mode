@@ -38,8 +38,6 @@ Paste Mode takes over paste functionality within Obsidian. It has seven paste mo
 ### Additional features
 
 - **Continue list items** — when enabled, if you paste multiple lines into a list item where all lines are at the same indentation level, list markers will be added to each pasted line to continue the list. For bullet lists, the same marker is used. For numbered lists, the numbers are automatically incremented. This setting is enabled by default.
-- **Dynamic attachment saving** — route pasted files to different folders based on the current note's location.  
-  ![](img/attachment_location_overrides.png)
 - **Download linked files** — when pasting Markdown, files referenced via `http://` or `file://` URLs can be downloaded locally.
 - **Automatic character escaping** — escape Markdown-sensitive characters (`==`, `<`, etc.) in blockquotes.
 

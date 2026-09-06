@@ -187,17 +187,10 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 }
 
-export interface AttachmentLocation {
-  cursorFilePattern: string;
-  targetLocation: string;
-}
-
 interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
   saveBase64EncodedFiles: boolean;
-  saveFilesLocation: string;
-  saveFilesOverrideLocations: AttachmentLocation[];
   escapeCharactersInBlockquotes: boolean;
   blockquoteEscapeCharactersRegex: string;
   escapeCharactersInNonBlockquotes: boolean;
@@ -214,8 +207,6 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   blockquotePrefix: "> ",
   mode: Mode.Markdown,
   saveBase64EncodedFiles: false,
-  saveFilesLocation: "Attachments",
-  saveFilesOverrideLocations: [],
   escapeCharactersInBlockquotes: false,
   blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
   escapeCharactersInNonBlockquotes: false,
@@ -789,7 +780,7 @@ class SettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Paste Mode")
-      .setDesc("Mode that the paste attachmentLocation will invoke.")
+      .setDesc("Mode that the paste command will invoke.")
       .addDropdown((dropdown) =>
         dropdown
           .addOption(Mode.Text, "Plain Text")
@@ -943,133 +934,5 @@ class SettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
       });
-
-    const attachmentsEl = containerEl.createEl("div");
-    attachmentsEl.addClass("attachment-locations");
-    attachmentsEl.createEl("h3", {
-      text: "Attachments",
-    });
-
-    new Setting(attachmentsEl)
-      .setName("Default attachment folder path")
-      .setDesc(
-        `When saving files from the clipboard, place them in this folder. ("{current}" will insert the directory of the currently-open note.)`
-      )
-      .addText((text) => {
-        text
-          .setValue(this.plugin.settings.saveFilesLocation)
-          .onChange(async (value) => {
-            this.plugin.settings.saveFilesLocation = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    const attachmentOverrideLocationsEl = attachmentsEl.createEl("div");
-    attachmentOverrideLocationsEl.addClass("attachment-locations");
-    attachmentOverrideLocationsEl.createEl("h4", {
-      text: "Attachment overrides",
-    });
-
-    const attachmentOverrideLocations =
-      this.plugin.settings.saveFilesOverrideLocations;
-    for (const [
-      attachmentLocationIndex,
-      attachmentLocation,
-    ] of attachmentOverrideLocations.entries()) {
-      const attachmentLocationEl =
-        attachmentOverrideLocationsEl.createEl("div");
-      attachmentLocationEl.addClass("attachment-override");
-
-      let deleteAttachmentLocationPrimed = false;
-      let attachmentLocationDeletePrimerTimer: ReturnType<
-        typeof setTimeout
-      > | null;
-
-      new Setting(attachmentLocationEl)
-        .setName("Current file directory")
-        .setDesc("If the current file is in this directory...")
-        .addText((text) => {
-          text
-            .setValue(attachmentLocation.cursorFilePattern)
-            .onChange(async (value) => {
-              this.plugin.settings.saveFilesOverrideLocations[
-                attachmentLocationIndex
-              ].cursorFilePattern = value;
-              await this.plugin.saveSettings();
-            });
-        });
-
-      new Setting(attachmentLocationEl)
-        .setName("Saved file target location")
-        .setDesc('...Save a pasted file into this directory. ("{current}" will insert the directory of the currently-open note.)')
-        .addText((text) => {
-          text
-            .setValue(attachmentLocation.targetLocation)
-            .onChange(async (value) => {
-              this.plugin.settings.saveFilesOverrideLocations[
-                attachmentLocationIndex
-              ].targetLocation = value;
-              await this.plugin.saveSettings();
-            });
-        });
-
-      new Setting(attachmentLocationEl)
-        .setName("Delete location rule")
-        .addButton((button) => {
-          button
-            .setButtonText("Delete")
-            .setClass("paste-mode-settings-delete-button")
-            .setTooltip("Delete override location")
-            .onClick(async () => {
-              if (attachmentLocationDeletePrimerTimer) {
-                clearTimeout(attachmentLocationDeletePrimerTimer);
-              }
-              if (deleteAttachmentLocationPrimed) {
-                this.plugin.settings.saveFilesOverrideLocations.splice(
-                  attachmentLocationIndex,
-                  1
-                );
-
-                await this.plugin.saveSettings();
-                this.display();
-                return;
-              }
-
-              attachmentLocationDeletePrimerTimer = setTimeout(
-                () => {
-                  deleteAttachmentLocationPrimed = false;
-                  attachmentLocationEl.removeClass("primed");
-                },
-                1000 * 4 // 4 second timeout
-              );
-              deleteAttachmentLocationPrimed = true;
-              attachmentLocationEl.addClass("primed");
-
-              new Notice(
-                `Click again to delete attachmentLocation ${attachmentLocationIndex + 1
-                }`
-              );
-            });
-        });
-    }
-
-    const addattachmentLocationButtonEl =
-      attachmentOverrideLocationsEl.createEl("div", {
-        cls: "add-attachmentLocation-button-el",
-      });
-
-    new Setting(addattachmentLocationButtonEl).addButton((button) => {
-      button
-        .setButtonText("Add attachment override location")
-        .setClass("add-attachmentLocation-button")
-        .onClick(async () => {
-          this.plugin.settings.saveFilesOverrideLocations.push({
-            cursorFilePattern: "",
-            targetLocation: "",
-          });
-          await this.plugin.saveSettings();
-          this.display();
-        });
-    });
   }
 }
