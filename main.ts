@@ -223,6 +223,13 @@ export default class PastetoIndentationPlugin extends Plugin {
   statusBar: HTMLElement;
   clipboardReadWorks: boolean;
 
+  private getIconName(baseName: string): string {
+    if (!this.app.isDarkMode()) {
+      return baseName;
+    }
+    return baseName + '-dark';
+  }
+
   async onload() {
     await this.loadSettings();
 
@@ -534,7 +541,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     MODE_ENTRIES.forEach(([key, value]) => {
       this.addCommand({
         id: `set-paste-mode-${key}`,
-        icon: `pasteIcons-${key}`,
+        icon: this.getIconName(`pasteIcons-${key}`),
         name: `Set Paste Mode to ${value}`,
         callback: () => changePasteMode(value),
       });
@@ -589,7 +596,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
       this.addCommand({
         id: `paste-in-mode-${key}`,
-        icon: `pasteIcons-${key}-hourglass`,
+        icon: this.getIconName(`pasteIcons-${key}-hourglass`),
         name: `Paste in ${value} Mode`,
         editorCallback: async (editor: Editor, view: MarkdownView) => {
           await pasteInMode(value, editor, view);
@@ -599,7 +606,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addCommand({
       id: `cycle-paste-mode`,
-      icon: `pasteIcons-clipboard-cycle`,
+      icon: this.getIconName(`pasteIcons-clipboard-cycle`),
       name: `Cycle Paste Mode`,
       callback: async () => {
         const currentIndex = MODE_VALUES.indexOf(this.settings.mode);
@@ -614,7 +621,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "toggle-blockquote-at-current-indentation",
       name: "Toggle blockquote at current indentation",
-      icon: "pasteIcons-quote-text",
+      icon: this.getIconName("pasteIcons-quote-text"),
       checkCallback: (checking: boolean) => {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (!view) {
@@ -629,7 +636,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addCommand({
       id: "set-paste-mode",
-      icon: "pasteIcons-clipboard-question",
+      icon: this.getIconName("pasteIcons-clipboard-question"),
       name: "Set paste mode",
       callback: () => {
         const newMode = new PasteModeModal({
@@ -649,7 +656,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     this.addCommand({
       id: "paste-in-mode-interactive",
-      icon: "pasteIcons-clipboard-question",
+      icon: this.getIconName("pasteIcons-clipboard-question"),
       name: "Paste in Mode (Interactive)",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const newMode = new PasteModeModal({

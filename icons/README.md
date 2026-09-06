@@ -17,3 +17,22 @@ Unfortunately, as of this writing, Excalidraw is [not able to embed fonts](https
    1. Paste an icon from the first file into the new file. Resize the icon to fit the `0 0 100 100` ViewBox set above.  
       _Note that Obsidian will cut off part of the edges of the icon when rendering it. Thus, icons should not touch the edge of the canvas._
    1. Click `File -> Save a Copy...`, and save an SVG of the icon.
+
+## Dark Mode Icons
+
+The `individual-icons/dark/` subdirectory contains copies of all icons with an invert filter applied. To regenerate these icons, run the provided bash script:
+
+```bash
+rm icons/individual-icons/dark/*.svg
+bash copy-and-style-icons.sh
+```
+
+This script:
+1. Copies all SVG files from `individual-icons/` to `individual-icons/dark/`
+2. Inserts a `<style>` tag with `filter: invert(1) !important;` after the opening `<svg>` tag in each copy
+
+The invert filter is applied at the SVG level to make dark-themed icons display correctly in light themes.
+
+## Regenerating the icons manifest file (`../icons.json`)
+
+Run `yarn run icons`.
