@@ -313,7 +313,10 @@ export default class PastetoIndentationPlugin extends Plugin {
             activeFilePath
           );
 
-          fileLinks.push(link);
+          // Prepend ! to image links so they display as images
+          const imageLink = fileObject.type.startsWith("image/") ? `!${link}` : link;
+
+          fileLinks.push(imageLink);
         }
 
         if (mode === Mode.Markdown || mode === Mode.MarkdownBlockquote) {
