@@ -1,4 +1,4 @@
-var DOMParser = require('xmldom').DOMParser;
+var DOMParser = require('@xmldom/xmldom').DOMParser;
 const fs = require('fs');
 var path = require('path');
 
