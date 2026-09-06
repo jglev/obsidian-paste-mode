@@ -61,6 +61,34 @@ const isLinkToImage = (url: string): boolean => {
   return /\.(jpg|jpeg|png|webp|avif|gif)$/.test(url);
 };
 
+const dedentLines = (lines: string[]): string[] => {
+  // Find minimum leading whitespace from non-empty lines
+  const nonEmptyLines = lines.filter((line) => line.trim() !== "");
+
+  if (nonEmptyLines.length === 0) {
+    return lines;
+  }
+
+  const minIndent = Math.min(
+    ...nonEmptyLines.map((line) => {
+      const match = line.match(/^(\s*)/);
+      return match ? match[1].length : 0;
+    })
+  );
+
+  if (minIndent === 0) {
+    return lines;
+  }
+
+  // Remove the common indentation from all lines
+  return lines.map((line) => {
+    if (line.trim() === "") {
+      return line;
+    }
+    return line.slice(minIndent);
+  });
+};
+
 const createTFileObject = async (
   fileName: string,
   arrayBuffer: ArrayBuffer,
@@ -432,6 +460,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
 
           const clipboardLines = clipboardContents.split("\n");
+          const dedentedLines = dedentLines(clipboardLines);
 
           // Detect if we're in a list context and extract the list marker
           let listMarker = "";
@@ -451,7 +480,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
 
           const input = [
-            ...(clipboardLines.some((l) => l !== "") ? clipboardLines : []),
+            ...(dedentedLines.some((l) => l !== "") ? dedentedLines : []),
             ...fileLinks,
           ].map((line, i) => {
             if (i === 0) {
@@ -461,7 +490,7 @@ export default class PastetoIndentationPlugin extends Plugin {
             let linePrefix = leadingWhitespace + additionalLeadingWhitespace;
 
             // Apply list marker if we're continuing list items
-            if (listMarker && i <= clipboardLines.length) {
+            if (listMarker && i <= dedentedLines.length) {
               const numberedMatch = listMarker.match(/^(\d+)\./);
               if (numberedMatch) {
                 // For numbered lists, increment the number
