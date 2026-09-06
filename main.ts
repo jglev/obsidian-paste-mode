@@ -111,22 +111,9 @@ const createTFileObject = async (
   return tfileObject;
 };
 
-const createImageFileName = async (
-  fileLocation: string,
-  extension: string,
-  app: App
-): Promise<string> => {
+const createAttachmentFileName = (extension: string): string => {
   const ts = timestamp();
-  let imageFileName = `${fileLocation || "."}/Pasted image ${ts}.${extension}`;
-
-  let imageFileNameIndex = 0;
-  while (await app.vault.adapter.exists(imageFileName)) {
-    imageFileName = `${fileLocation || "."
-      }/Pasted image ${ts}_${imageFileNameIndex}.${extension}`;
-    imageFileNameIndex += 1;
-  }
-
-  return imageFileName;
+  return `Pasted image ${ts}.${extension}`;
 };
 
 class PasteModeModal extends FuzzySuggestModal<number> {
@@ -294,15 +281,6 @@ export default class PastetoIndentationPlugin extends Plugin {
 
           const app = this.app;
 
-          const ensureFolder = async (location: string) => {
-            if (!(await app.vault.adapter.exists(location))) {
-              await app.vault.createFolder(location);
-            }
-          };
-
-          const resolveLocation = (template: string) =>
-            template.replace(CURRENT_FILE_PLACEHOLDER, activeFile.parent.path);
-
           let clipboardContents = "";
           let output = "";
 
@@ -311,29 +289,10 @@ export default class PastetoIndentationPlugin extends Plugin {
           const activeFile = app.workspace.getActiveFile();
           const activeFilePath = activeFile?.path;
 
-          let filesTargetLocation = resolveLocation(this.settings.saveFilesLocation);
-          let longestMatchingCursorFilePattern = 0;
-          this.settings.saveFilesOverrideLocations.forEach((location) => {
-            if (
-              activeFilePath &&
-              activeFilePath.startsWith(location.cursorFilePattern) &&
-              location.cursorFilePattern.length > longestMatchingCursorFilePattern
-            ) {
-              filesTargetLocation = resolveLocation(location.targetLocation);
-              longestMatchingCursorFilePattern =
-                location.cursorFilePattern.length;
-            }
-          });
-
-          if (files.length) {
-            await ensureFolder(filesTargetLocation);
-          }
-
           for (const fileObject of files) {
-            const fileName = await createImageFileName(
-              filesTargetLocation,
-              fileObject.type.split("/")[1],
-              app
+            const fileName = await app.fileManager.getAvailablePathForAttachment(
+              createAttachmentFileName(fileObject.type.split("/")[1]),
+              activeFilePath
             );
 
             const tfileObject = await createTFileObject(
@@ -402,12 +361,9 @@ export default class PastetoIndentationPlugin extends Plugin {
                 continue;
               }
 
-              await ensureFolder(filesTargetLocation);
-
-              const fileName = await createImageFileName(
-                filesTargetLocation,
-                src.split(".").pop()!,
-                app
+              const fileName = await app.fileManager.getAvailablePathForAttachment(
+                createAttachmentFileName(src.split(".").pop()!),
+                activeFilePath
               );
               const tfileObject = await createTFileObject(
                 fileName,
@@ -464,13 +420,10 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             // Reverse so string replacements don't invalidate later indices:
             for (const image of images.reverse()) {
-              const imageFileName = await createImageFileName(
-                filesTargetLocation,
-                image.groups.extension,
-                app
+              const imageFileName = await app.fileManager.getAvailablePathForAttachment(
+                createAttachmentFileName(image.groups.extension),
+                activeFilePath
               );
-
-              await ensureFolder(filesTargetLocation);
 
               await app.vault.createBinary(
                 imageFileName,
