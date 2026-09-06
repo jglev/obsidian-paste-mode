@@ -45,6 +45,22 @@ const timestamp = () => {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}${String(d.getSeconds()).padStart(2, "0")}`;
 };
 
+const isURL = (str: string): boolean => {
+  if (str.startsWith("app://")) {
+    return false;
+  }
+  try {
+    new URL(str);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+const isLinkToImage = (url: string): boolean => {
+  return /\.(jpg|jpeg|png|webp|avif|gif)$/.test(url);
+};
+
 const createTFileObject = async (
   fileName: string,
   arrayBuffer: ArrayBuffer,
@@ -263,6 +279,12 @@ export default class PastetoIndentationPlugin extends Plugin {
           let mode = this.settings.mode;
 
           if (mode === Mode.Passthrough) {
+            return;
+          }
+
+          // Allow other plugins to handle plain URLs (e.g., auto-embed)
+          const clipboardText = evt.clipboardData.getData("text")?.trim() || "";
+          if (clipboardText && isURL(clipboardText) && !isLinkToImage(clipboardText)) {
             return;
           }
 
