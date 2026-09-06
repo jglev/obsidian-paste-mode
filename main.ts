@@ -718,6 +718,18 @@ export default class PastetoIndentationPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  private isIndexInsideLink(output: string, index: number): boolean {
+    // Check if the index is inside an image embed (![[...]]) or regular link ([[...]])
+    const linkPattern = /(!?\[\[.*?\]\])/g;
+    let match;
+    while ((match = linkPattern.exec(output)) !== null) {
+      if (index >= match.index && index < match.index + match[0].length) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   escapeBlockquoteCharacters(output: string): string {
     const regex = new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g");
     const indices = [...output.matchAll(regex)]
@@ -725,6 +737,10 @@ export default class PastetoIndentationPlugin extends Plugin {
       .reverse();
 
     for (const index of indices) {
+      // Skip if this character is inside a link or image embed:
+      if (this.isIndexInsideLink(output, index)) {
+        continue;
+      }
       // Don't add a backslash if one already precedes the character:
       if (output[index - 1] !== "\\") {
         output = output.substring(0, index) + "\\" + output.substring(index);
@@ -741,6 +757,10 @@ export default class PastetoIndentationPlugin extends Plugin {
       .reverse();
 
     for (const index of indices) {
+      // Skip if this character is inside a link or image embed:
+      if (this.isIndexInsideLink(output, index)) {
+        continue;
+      }
       // Don't add a backslash if one already precedes the character:
       if (output[index - 1] !== "\\") {
         output = output.substring(0, index) + "\\" + output.substring(index);
