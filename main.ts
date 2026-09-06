@@ -197,10 +197,13 @@ interface PastetoIndentationPluginSettings {
   saveFilesOverrideLocations: AttachmentLocation[];
   escapeCharactersInBlockquotes: boolean;
   blockquoteEscapeCharactersRegex: string;
+  escapeCharactersInNonBlockquotes: boolean;
+  nonBlockquoteEscapeCharactersRegex: string;
   srcAttributeCopyRegex: string;
 }
 
 const defaultBlockquoteEscapeCharacters = "(==|<)";
+const defaultNonBlockquoteEscapeCharacters = "(\\[)";
 const defaultSrcAttributeCopyRegex = "";
 
 const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
@@ -211,6 +214,8 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   saveFilesOverrideLocations: [],
   escapeCharactersInBlockquotes: false,
   blockquoteEscapeCharactersRegex: defaultBlockquoteEscapeCharacters,
+  escapeCharactersInNonBlockquotes: false,
+  nonBlockquoteEscapeCharactersRegex: defaultNonBlockquoteEscapeCharacters,
   srcAttributeCopyRegex: defaultSrcAttributeCopyRegex,
 };
 
@@ -471,6 +476,10 @@ export default class PastetoIndentationPlugin extends Plugin {
 
           if (mode === Mode.Text || mode === Mode.Markdown) {
             output = input.join("\n");
+
+            if (this.settings.escapeCharactersInNonBlockquotes) {
+              output = this.escapeNonBlockquoteCharacters(output);
+            }
           }
 
           if (mode === Mode.CodeBlock) {
@@ -722,6 +731,22 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     return output;
   }
+
+  escapeNonBlockquoteCharacters(output: string): string {
+    const regex = new RegExp(this.settings.nonBlockquoteEscapeCharactersRegex, "g");
+    const indices = [...output.matchAll(regex)]
+      .map((x) => x.index!)
+      .reverse();
+
+    for (const index of indices) {
+      // Don't add a backslash if one already precedes the character:
+      if (output[index - 1] !== "\\") {
+        output = output.substring(0, index) + "\\" + output.substring(index);
+      }
+    }
+
+    return output;
+  }
 }
 
 class SettingTab extends PluginSettingTab {
@@ -837,6 +862,41 @@ class SettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.blockquoteEscapeCharactersRegex =
               value || defaultBlockquoteEscapeCharacters;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Escape characters in normal text")
+      .setDesc(
+        `When pasting in Text or Markdown mode, add a backslash escape character to the beginning of specific characters.`
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.escapeCharactersInNonBlockquotes)
+          .onChange(async (value) => {
+            this.plugin.settings.escapeCharactersInNonBlockquotes = value;
+            await this.plugin.saveSettings();
+            this.display();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName("Escape characters in normal text regex")
+      .setDesc(
+        `A Regular Expression expressing which characters to escape when pasting in Text or Markdown mode.`
+      )
+      .setDisabled(!this.plugin.settings.escapeCharactersInNonBlockquotes)
+      .addText((text) => {
+        text
+          .setValue(
+            this.plugin.settings.nonBlockquoteEscapeCharactersRegex ||
+            defaultNonBlockquoteEscapeCharacters
+          )
+          .setPlaceholder(defaultNonBlockquoteEscapeCharacters)
+          .onChange(async (value) => {
+            this.plugin.settings.nonBlockquoteEscapeCharactersRegex =
+              value || defaultNonBlockquoteEscapeCharacters;
             await this.plugin.saveSettings();
           });
       });
