@@ -216,6 +216,7 @@ interface PastetoIndentationPluginSettings {
   escapeCharactersInNonBlockquotes: boolean;
   nonBlockquoteEscapeCharactersRegex: string;
   srcAttributeCopyRegex: string;
+  continueListItems: boolean;
 }
 
 const defaultBlockquoteEscapeCharacters = "(==|<)";
@@ -233,6 +234,7 @@ const DEFAULT_SETTINGS: PastetoIndentationPluginSettings = {
   escapeCharactersInNonBlockquotes: false,
   nonBlockquoteEscapeCharactersRegex: defaultNonBlockquoteEscapeCharacters,
   srcAttributeCopyRegex: defaultSrcAttributeCopyRegex,
+  continueListItems: false,
 };
 
 for (const [key, value] of Object.entries(pluginIcons)) {
@@ -486,6 +488,24 @@ export default class PastetoIndentationPlugin extends Plugin {
           }
 
           const clipboardLines = clipboardContents.split("\n");
+
+          // Detect if we're in a list context and extract the list marker
+          let listMarker = "";
+          if (this.settings.continueListItems && leadingWhitespaceMatch && leadingWhitespaceMatch[2]) {
+            const lineContent = leadingWhitespaceMatch[2];
+            // Match bullet markers (- , * , + ) with optional checkboxes
+            const bulletMatch = lineContent.match(/^([-*+]\s*(?:\[[ xX]\]\s*)?)/);
+            // Match numbered list markers (1. , 2. , etc.)
+            const numberedMatch = lineContent.match(/^(\d+\.\s*(?:\[[ xX]\]\s*)?)/);
+
+            if (bulletMatch) {
+              listMarker = bulletMatch[1];
+            } else if (numberedMatch) {
+              // For numbered lists, we'll increment the number for each line
+              listMarker = numberedMatch[1];
+            }
+          }
+
           const input = [
             ...(clipboardLines.some((l) => l !== "") ? clipboardLines : []),
             ...fileLinks,
@@ -493,7 +513,23 @@ export default class PastetoIndentationPlugin extends Plugin {
             if (i === 0) {
               return line;
             }
-            return leadingWhitespace + additionalLeadingWhitespace + line;
+
+            let linePrefix = leadingWhitespace + additionalLeadingWhitespace;
+
+            // Apply list marker if we're continuing list items
+            if (listMarker && i <= clipboardLines.length) {
+              const numberedMatch = listMarker.match(/^(\d+)\./);
+              if (numberedMatch) {
+                // For numbered lists, increment the number
+                const currentNumber = parseInt(numberedMatch[1]) + i - 1;
+                linePrefix = leadingWhitespace + listMarker.replace(/^\d+\./, currentNumber + ".");
+              } else {
+                // For bullet lists, just use the same marker
+                linePrefix = leadingWhitespace + listMarker;
+              }
+            }
+
+            return linePrefix + line;
           });
 
           if (mode === Mode.Text || mode === Mode.Markdown) {
@@ -852,6 +888,20 @@ class SettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Continue list items")
+      .setDesc(
+        "When pasting multiple lines into a list item where all lines are at the same indentation level, add list markers to each pasted line to continue the list."
+      )
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.continueListItems)
+          .onChange(async (value) => {
+            this.plugin.settings.continueListItems = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName("Escape characters in blockquotes")
