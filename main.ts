@@ -250,13 +250,13 @@ export default class PastetoIndentationPlugin extends Plugin {
         if (evt.defaultPrevented) {
           return;
         }
-        evt.preventDefault();
 
         let mode = this.settings.mode;
 
         if (mode === Mode.Passthrough) {
           return;
         }
+        evt.preventDefault();
 
         let clipboardContents = "";
         let output = "";
