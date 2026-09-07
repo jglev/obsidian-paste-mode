@@ -6,21 +6,27 @@
   "scripts": {
     "icons": "node createIconsDict.js",
     "dev": "yarn icons && node esbuild.config.mjs",
-    "build": "yarn icons && node esbuild.config.mjs production"
+    "build": "yarn icons && node esbuild.config.mjs production && cp manifest.json dist/build/ && cp styles.css dist/build/",
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",
   "author": "Jacob Levernier",
   "license": "BSD-3-Clause",
   "devDependencies": {
+    "@jest/globals": "^30.5.1",
     "@types/jest": "^26.0.24",
     "@types/node": "^14.14.37",
     "@xmldom/xmldom": "^0.9.12",
     "builtin-modules": "^5.3.0",
     "esbuild": "^0.28.2",
+    "jest": "^30.5.1",
     "obsidian": "^1.1.1",
+    "obsidian-integration-testing": "^12.0.0",
+    "ts-jest": "^29.4.12",
     "tslib": "^2.2.0",
-    "typescript": "^4.3.5"
+    "typescript": "^5.7.0"
   },
   "dependencies": {
     "@types/lodash.clonedeep": "^4.5.7",

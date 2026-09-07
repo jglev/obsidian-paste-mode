@@ -8,6 +8,7 @@ package-lock.json
 
 # build
 main.js
+dist
 *.js.map
 
 # obsidian
@@ -15,3 +16,4 @@ data.json
 
 # For the Obsidian hotreload plugin:
 .hotreload
+

@@ -23,7 +23,7 @@ const config = {
   logLevel: "info",
   sourcemap: prod ? false : 'inline',
   treeShaking: true,
-  outfile: 'main.js',
+  outfile: prod ? 'dist/build/main.js' : 'dist/dev/main.js',
 };
 
 if (prod) {
