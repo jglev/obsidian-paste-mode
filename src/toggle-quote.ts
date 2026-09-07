@@ -50,7 +50,7 @@ export const toggleQuote = (
       : " ".repeat(minLeadingWhitespaceLength);
 
   const prefixedLineRegex = new RegExp(
-    `^\\s{${minLeadingWhitespaceLength}}${escapedPrefix}`
+    `^(\\s{${minLeadingWhitespaceLength}})${escapedPrefix}`
   );
 
   // Determine whether *every* line is Prefixed or not:
