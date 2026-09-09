@@ -52,6 +52,12 @@ export const pasteAndGetResult = async ({
   expectContentChange,
 }: CommonArguments & PasteTestInput): Promise<string> => {
   const plugin = (app as any).plugins.plugins[pluginId];
+  // Reset settings to their defaults before applying this test's overrides.
+  // Without this, settings mutated by an earlier test (e.g.
+  // `continueListItems: true`) would otherwise leak into later tests that
+  // don't explicitly specify every setting, since the plugin instance (and
+  // its settings object) is shared across the whole test run.
+  await plugin.loadSettings();
   if (settings) {
     Object.assign(plugin.settings, settings);
   }

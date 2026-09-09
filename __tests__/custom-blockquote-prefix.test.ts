@@ -135,9 +135,9 @@ describe('custom blockquote prefix', () => {
         mode: 'Text (Blockquote)',
         path: 'custom-prefix-list.md',
         pluginId,
-        settings: { 
+        settings: {
           blockquotePrefix: '| ',
-          continueListItems: true 
+          continueListItems: true
         },
       },
       vaultPath: vault.path,

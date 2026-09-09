@@ -29,17 +29,17 @@ describe('clipboard event handling and validation', () => {
           cancelable: true,
           clipboardData: dataTransfer,
         });
-        
+
         // Simulate another plugin already handling this event
         clipboardEvent.preventDefault();
 
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         // Wait a bit to ensure async handling doesn't occur
         await new Promise((r) => setTimeout(r, 200));
 
-        return { 
+        return {
           after: editor.getValue(),
           changed: editor.getValue() !== before
         };
@@ -64,7 +64,7 @@ describe('clipboard event handling and validation', () => {
         mode: 'Text (Blockquote)',
         path: 'invalid-regex-blockquote.md',
         pluginId,
-        settings: { 
+        settings: {
           escapeCharactersInBlockquotes: true,
           blockquoteEscapeCharactersRegex: '[invalid(' // Invalid regex
         },
@@ -88,7 +88,7 @@ describe('clipboard event handling and validation', () => {
         mode: 'Text',
         path: 'invalid-regex-non-blockquote.md',
         pluginId,
-        settings: { 
+        settings: {
           escapeCharactersInNonBlockquotes: true,
           nonBlockquoteEscapeCharactersRegex: '*invalid*' // Invalid regex
         },
@@ -112,7 +112,7 @@ describe('clipboard event handling and validation', () => {
         mode: 'Markdown',
         path: 'invalid-regex-src.md',
         pluginId,
-        settings: { 
+        settings: {
           srcAttributeCopyRegex: '(?P<invalid)' // Invalid regex with bad group
         },
       },
@@ -182,7 +182,7 @@ describe('clipboard event handling and validation', () => {
     expect(result).toBe('');
   });
 
-  it('does not intercept image links being pasted as plain text', async () => {
+  it('intercepts image links pasted as plain text but leaves them unchanged', async () => {
     const result = await evalInObsidian({
       callback: pasteAndGetResult,
       input: {
@@ -193,13 +193,15 @@ describe('clipboard event handling and validation', () => {
         mode: 'Markdown',
         path: 'image-link-plain.md',
         pluginId,
-        expectContentChange: false,
       },
       vaultPath: vault.path,
     });
 
-    // Image URL pasted as plain text should be allowed through
-    expect(result).toBe('');
+    // Unlike plain (non-image) URLs, image links are intercepted by the
+    // plugin rather than passed through to other plugins (e.g. auto-embed).
+    // Since only plain text (no HTML) was on the clipboard, the plugin has
+    // nothing to convert, so it re-inserts the URL text unchanged.
+    expect(result).toBe('https://example.com/image.jpg');
   });
 
   it('handles paste with special regex characters in content when escaping enabled', async () => {
@@ -213,7 +215,7 @@ describe('clipboard event handling and validation', () => {
         mode: 'Text',
         path: 'special-regex-chars.md',
         pluginId,
-        settings: { 
+        settings: {
           escapeCharactersInNonBlockquotes: true,
           nonBlockquoteEscapeCharactersRegex: '(\\[)' // Only escape [
         },
@@ -257,7 +259,7 @@ describe('clipboard event handling and validation', () => {
         mode: 'Text (Blockquote)',
         path: 'regex-lookahead.md',
         pluginId,
-        settings: { 
+        settings: {
           escapeCharactersInBlockquotes: true,
           blockquoteEscapeCharactersRegex: '(<)' // Simple pattern
         },
@@ -274,7 +276,7 @@ describe('clipboard event handling and validation', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
-        
+
         // Start with one setting
         plugin.settings.mode = 'Text';
         plugin.settings.blockquotePrefix = '> ';

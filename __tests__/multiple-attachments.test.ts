@@ -21,6 +21,7 @@ describe('multiple file attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         const file = await lib.createNote({ content: '', path: 'multi-file-paste.md' });
@@ -34,12 +35,12 @@ describe('multiple file attachments', () => {
         const pngBytes = `iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=`;
 
         const dataTransfer = new DataTransfer();
-        
+
         // Add multiple image files
         const file1 = new File([atob(pngBytes).split('').map(c => c.charCodeAt(0))], 'test1.png', { type: 'image/png' });
         const file2 = new File([atob(pngBytes).split('').map(c => c.charCodeAt(0))], 'test2.png', { type: 'image/png' });
         const file3 = new File([atob(pngBytes).split('').map(c => c.charCodeAt(0))], 'test3.png', { type: 'image/png' });
-        
+
         dataTransfer.items.add(file1);
         dataTransfer.items.add(file2);
         dataTransfer.items.add(file3);
@@ -47,7 +48,7 @@ describe('multiple file attachments', () => {
         const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         await lib.waitUntil({
           message: 'editor content did not change after multiple file paste',
           predicate: () => editor.getValue() !== before,
@@ -57,8 +58,8 @@ describe('multiple file attachments', () => {
         const content = editor.getValue();
         const linkMatches = [...content.matchAll(/!\[\[Pasted image \d+(?:\s\d+)?\.png\]\]/g)];
 
-        return { 
-          content, 
+        return {
+          content,
           linkCount: linkMatches.length,
           allAttachmentsExist: linkMatches.every(match => {
             const linkText = match[0];
@@ -79,6 +80,7 @@ describe('multiple file attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         const file = await lib.createNote({ content: '', path: 'multi-file-order.md' });
@@ -91,7 +93,7 @@ describe('multiple file attachments', () => {
 
         const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
         const pngBytes = atob(pngBase64);
-        
+
         const dataTransfer = new DataTransfer();
         for (let i = 0; i < 2; i++) {
           const bytes = new Uint8Array(pngBytes.length);
@@ -105,7 +107,7 @@ describe('multiple file attachments', () => {
         const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         await lib.waitUntil({
           message: 'editor content did not change after file paste',
           predicate: () => editor.getValue() !== before,
@@ -127,6 +129,7 @@ describe('multiple file attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         const file = await lib.createNote({ content: '', path: 'mixed-content-paste.md' });
@@ -142,7 +145,7 @@ describe('multiple file attachments', () => {
 
         const dataTransfer = new DataTransfer();
         dataTransfer.setData('text/plain', 'Some pasted text');
-        
+
         const bytes = new Uint8Array(pngBytes.length);
         for (let i = 0; i < pngBytes.length; i++) {
           bytes[i] = pngBytes.charCodeAt(i);
@@ -153,7 +156,7 @@ describe('multiple file attachments', () => {
         const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         await lib.waitUntil({
           message: 'editor content did not change after paste',
           predicate: () => editor.getValue() !== before,
@@ -175,6 +178,7 @@ describe('multiple file attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         const file = await lib.createNote({ content: '    ', path: 'indented-files.md' });
@@ -189,7 +193,7 @@ describe('multiple file attachments', () => {
         const pngBytes = atob(pngBase64);
 
         const dataTransfer = new DataTransfer();
-        
+
         for (let i = 0; i < 2; i++) {
           const bytes = new Uint8Array(pngBytes.length);
           for (let j = 0; j < pngBytes.length; j++) {
@@ -202,7 +206,7 @@ describe('multiple file attachments', () => {
         const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         await lib.waitUntil({
           message: 'editor content did not change after file paste',
           predicate: () => editor.getValue() !== before,

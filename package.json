@@ -7,8 +7,8 @@
     "icons": "node createIconsDict.js",
     "dev": "yarn icons && node esbuild.config.mjs",
     "build": "yarn icons && node esbuild.config.mjs production && cp manifest.json dist/build/ && cp styles.css dist/build/",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "yarn build && jest",
+    "test:watch": "yarn build && jest --watch"
   },
   "keywords": [],
   "repository": "https://github.com/publicus/obsidian-paste-to-current-indentation",

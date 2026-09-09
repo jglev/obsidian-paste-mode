@@ -343,9 +343,14 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             // Find all elements with a src attribute:
             const srcContainingElements = htmlDom.querySelectorAll("[src]");
-            const srcRegex = this.settings.srcAttributeCopyRegex
-              ? new RegExp(this.settings.srcAttributeCopyRegex)
-              : null;
+            let srcRegex: RegExp | null = null;
+            if (this.settings.srcAttributeCopyRegex) {
+              try {
+                srcRegex = new RegExp(this.settings.srcAttributeCopyRegex);
+              } catch (e) {
+                console.error("Paste Mode: Invalid srcAttributeCopyRegex, skipping src attribute copying.", e);
+              }
+            }
 
             for (const [i, el] of srcContainingElements.entries()) {
               const src = el.getAttr("src");
@@ -353,46 +358,59 @@ export default class PastetoIndentationPlugin extends Plugin {
                 continue;
               }
 
-              let dataBlob: Blob | undefined;
-
               // app://obsidian.md URLs are relative paths prepended by Obsidian;
               // we cannot resolve them, so skip.
               if (src.startsWith("app://obsidian.md")) {
                 continue;
               }
 
-              if (src.startsWith("file://")) {
-                let urlForDownloading = decodeURI(src).replace(/^file:\/{2}/, "");
+              try {
+                let dataBlob: Blob | undefined;
 
-                if (/^\/[A-Za-z]:/.test(urlForDownloading)) {
-                  // Windows: remove extra leading slash
-                  urlForDownloading = urlForDownloading.replace(/^\//, '');
+                if (src.startsWith("file://")) {
+                  let urlForDownloading = decodeURI(src).replace(/^file:\/{2}/, "");
+
+                  if (/^\/[A-Za-z]:/.test(urlForDownloading)) {
+                    // Windows: remove extra leading slash
+                    urlForDownloading = urlForDownloading.replace(/^\//, '');
+                  }
+
+                  dataBlob = new Blob([
+                    await FileSystemAdapter.readLocalFile(urlForDownloading),
+                  ]);
+                } else {
+                  // Guard against network requests that hang or fail (e.g.
+                  // unreachable hosts), so a single bad `src` doesn't leave
+                  // the whole paste stuck:
+                  dataBlob = await (
+                    await fetch(src, { signal: AbortSignal.timeout(5000) })
+                  ).blob();
                 }
 
-                dataBlob = new Blob([
-                  await FileSystemAdapter.readLocalFile(urlForDownloading),
-                ]);
-              } else {
-                dataBlob = await (await fetch(src)).blob();
-              }
+                if (!dataBlob) {
+                  continue;
+                }
 
-              if (!dataBlob) {
+                const fileName = await app.fileManager.getAvailablePathForAttachment(
+                  createAttachmentFileName(src.split(".").pop()!),
+                  activeFilePath
+                );
+                const tfileObject = await createTFileObject(
+                  fileName,
+                  await getBlobArrayBuffer(dataBlob),
+                  app
+                );
+
+                const encodedPath = encodeURI(tfileObject.path);
+                el.setAttr("src", encodedPath);
+                el.setAttr("alt", encodedPath.replaceAll('\n', ' '));
+              } catch (e) {
+                console.error(
+                  `Paste Mode: Failed to copy src attribute for ${src}, leaving it as-is.`,
+                  e
+                );
                 continue;
               }
-
-              const fileName = await app.fileManager.getAvailablePathForAttachment(
-                createAttachmentFileName(src.split(".").pop()!),
-                activeFilePath
-              );
-              const tfileObject = await createTFileObject(
-                fileName,
-                await getBlobArrayBuffer(dataBlob),
-                app
-              );
-
-              const encodedPath = encodeURI(tfileObject.path);
-              el.setAttr("src", encodedPath);
-              el.setAttr("alt", encodedPath.replaceAll('\n', ' '));
             }
 
             clipboardContents = htmlToMarkdown(htmlDom.documentElement.innerHTML);
@@ -466,10 +484,12 @@ export default class PastetoIndentationPlugin extends Plugin {
           let listMarker = "";
           if (this.settings.continueListItems && leadingWhitespaceMatch && leadingWhitespaceMatch[2]) {
             const lineContent = leadingWhitespaceMatch[2];
-            // Match bullet markers (- , * , + ) with optional checkboxes
-            const bulletMatch = lineContent.match(/^([-*+]\s*(?:\[[ xX]\]\s*)?)/);
-            // Match numbered list markers (1. , 2. , etc.)
-            const numberedMatch = lineContent.match(/^(\d+\.\s*(?:\[[ xX]\]\s*)?)/);
+            // Match bullet markers (- , * , + ) with optional checkboxes.
+            // Require at least one space after the marker character, since
+            // e.g. "-Content" (no space) is not a valid list marker.
+            const bulletMatch = lineContent.match(/^([-*+]\s+(?:\[[ xX]\]\s*)?)/);
+            // Match numbered list markers (1. , 2. , etc.), same requirement.
+            const numberedMatch = lineContent.match(/^(\d+\.\s+(?:\[[ xX]\]\s*)?)/);
 
             if (bulletMatch) {
               listMarker = bulletMatch[1];
@@ -760,7 +780,13 @@ export default class PastetoIndentationPlugin extends Plugin {
   }
 
   escapeBlockquoteCharacters(output: string): string {
-    const regex = new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g");
+    let regex: RegExp;
+    try {
+      regex = new RegExp(this.settings.blockquoteEscapeCharactersRegex, "g");
+    } catch (e) {
+      console.error("Paste Mode: Invalid blockquoteEscapeCharactersRegex, skipping character escaping.", e);
+      return output;
+    }
     const indices = [...output.matchAll(regex)]
       .map((x) => x.index!)
       .reverse();
@@ -780,7 +806,13 @@ export default class PastetoIndentationPlugin extends Plugin {
   }
 
   escapeNonBlockquoteCharacters(output: string): string {
-    const regex = new RegExp(this.settings.nonBlockquoteEscapeCharactersRegex, "g");
+    let regex: RegExp;
+    try {
+      regex = new RegExp(this.settings.nonBlockquoteEscapeCharactersRegex, "g");
+    } catch (e) {
+      console.error("Paste Mode: Invalid nonBlockquoteEscapeCharactersRegex, skipping character escaping.", e);
+      return output;
+    }
     const indices = [...output.matchAll(regex)]
       .map((x) => x.index!)
       .reverse();

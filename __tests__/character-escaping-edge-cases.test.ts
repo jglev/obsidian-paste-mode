@@ -12,7 +12,7 @@ describe('character escaping edge cases', () => {
     const result = await evalInObsidian({
       callback: pasteAndGetResult,
       input: {
-        clipboardText: 'text [[link < with special chars]] more',
+        clipboardText: 'text < [[link < with special chars]] more',
         cursorCh: 0,
         cursorLine: 0,
         initialContent: '',
@@ -28,7 +28,6 @@ describe('character escaping edge cases', () => {
     expect(result).toMatch(/\[\[link < with special chars\]\]/);
     // The first < should be escaped (before the link)
     expect(result).toMatch(/text \\</);
-  });
   });
 
   it('does not escape characters inside image embeds', async () => {

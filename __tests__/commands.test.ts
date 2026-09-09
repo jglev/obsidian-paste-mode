@@ -10,6 +10,7 @@ describe('commands', () => {
     const result = await evalInObsidian({
       callback: async ({ app, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         (app as any).commands.executeCommandById(`${pluginId}:cycle-paste-mode`);
@@ -27,6 +28,7 @@ describe('commands', () => {
     const result = await evalInObsidian({
       callback: async ({ app, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         (app as any).commands.executeCommandById(`${pluginId}:set-paste-mode-CodeBlock`);
@@ -44,6 +46,7 @@ describe('commands', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
 
         const file = await lib.createNote({ content: 'Hello World', path: 'toggle-blockquote.md' });
         const leaf = app.workspace.getLeaf(false);

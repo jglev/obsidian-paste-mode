@@ -14,6 +14,7 @@ describe('attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, base64Png, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
 
         const file = await lib.createNote({ content: '', path: 'file-paste.md' });
@@ -61,6 +62,7 @@ describe('attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, base64Png, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Markdown';
         plugin.settings.saveBase64EncodedFiles = true;
 
@@ -105,6 +107,7 @@ describe('attachments', () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, base64Png, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Markdown';
         plugin.settings.saveBase64EncodedFiles = false;
 

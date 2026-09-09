@@ -186,8 +186,8 @@ describe('list continuation edge cases', () => {
     const result = await evalInObsidian({
       callback: pasteAndGetResult,
       input: {
-        clipboardText: 'Content',
-        cursorCh: 1,
+        clipboardText: 'Line one\nLine two',
+        cursorCh: 8,
         cursorLine: 0,
         initialContent: '-Content',
         mode: 'Text',
@@ -198,14 +198,18 @@ describe('list continuation edge cases', () => {
       vaultPath: vault.path,
     });
 
-    // No valid list marker (no space after -), so no continuation
-    expect(result).toBe('-Content');
+    // "-Content" has no space after the "-", so it is not a valid list
+    // marker: the second pasted line should not gain a "-" prefix (though
+    // it still gets generic alignment whitespace, capped at 3 characters,
+    // matching the plugin's general continuation-indentation behavior).
+    expect(result).toBe('-ContentLine one\n   Line two');
   });
 
   it('only applies list marker to lines within the pasted content, not file links', async () => {
     const result = await evalInObsidian({
       callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
         const plugin = app.plugins.plugins[pluginId];
+        await plugin.loadSettings();
         plugin.settings.mode = 'Text';
         plugin.settings.continueListItems = true;
 
@@ -219,7 +223,7 @@ describe('list continuation edge cases', () => {
 
         const dataTransfer = new DataTransfer();
         dataTransfer.setData('text/plain', 'Attachment description');
-        
+
         const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
         const pngBytes = atob(pngBase64);
         const bytes = new Uint8Array(pngBytes.length);
@@ -232,7 +236,7 @@ describe('list continuation edge cases', () => {
         const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
         const before = editor.getValue();
         app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-        
+
         await lib.waitUntil({
           message: 'editor content did not change after paste',
           predicate: () => editor.getValue() !== before,
@@ -254,7 +258,7 @@ describe('list continuation edge cases', () => {
       callback: pasteAndGetResult,
       input: {
         clipboardText: 'Sub-item two',
-        cursorCh: 6,
+        cursorCh: 5,
         cursorLine: 2,
         initialContent: '1. Main\n   - Sub-item one\n   - ',
         mode: 'Text',

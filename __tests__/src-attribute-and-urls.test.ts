@@ -87,8 +87,9 @@ describe('src attribute handling and URL detection', () => {
       vaultPath: vault.path,
     });
 
-    // Should have text and either a local link or the original URL
-    expect(result).toContain('text with image');
+    // Should have an image link, either pointing at a locally-downloaded
+    // copy (network available) or the original URL (network unavailable):
+    expect(result).toContain('.png');
   });
 
   it('does not copy HTML src attributes when srcAttributeCopyRegex does not match', async () => {
@@ -151,8 +152,8 @@ describe('src attribute handling and URL detection', () => {
       vaultPath: vault.path,
     });
 
-    // Should have text and handle multiple images
-    expect(result).toContain('multiple images');
+    // Should handle both images (either downloaded locally or left as-is):
+    expect(result.match(/!\[.*?\]\(.*?\.png\)/g)?.length ?? 0).toBe(2);
   });
 
   it('preserves non-matching src attributes alongside matching ones', async () => {
@@ -173,7 +174,10 @@ describe('src attribute handling and URL detection', () => {
       vaultPath: vault.path,
     });
 
-    // Should contain text and handle sources
-    expect(result).toContain('mixed sources');
+    // The non-matching data: URI should be preserved unchanged, and the
+    // matching .png source should still appear as an image link (either
+    // downloaded locally or left as-is):
+    expect(result).toContain('data:image/svg+xml;test');
+    expect(result).toContain('.png');
   });
 });
