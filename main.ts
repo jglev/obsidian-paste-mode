@@ -215,7 +215,7 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }
 }
 
-interface PastetoIndentationPluginSettings {
+export interface PastetoIndentationPluginSettings {
   blockquotePrefix: string;
   mode: Mode;
   saveBase64EncodedFiles: boolean;

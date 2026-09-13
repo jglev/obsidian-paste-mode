@@ -2,7 +2,8 @@ import { describe, expect, it } from '@jest/globals';
 import { evalInObsidian } from 'obsidian-integration-testing';
 import { getTemporaryVault } from 'obsidian-integration-testing/jest-global-setup-plugin';
 
-import { pasteAndGetResult } from './helpers/e2e-paste';
+import { ONE_PIXEL_PNG_BASE64 } from './helpers/fixtures';
+import { pasteAndGetResult, pasteFilesAndGetResult } from './helpers/e2e-paste';
 
 describe('list continuation edge cases', () => {
   const vault = getTemporaryVault();
@@ -207,50 +208,23 @@ describe('list continuation edge cases', () => {
 
   it('only applies list marker to lines within the pasted content, not file links', async () => {
     const result = await evalInObsidian({
-      callback: async ({ app, obsidianModule, lib, pluginId }: any) => {
-        const plugin = app.plugins.plugins[pluginId];
-        await plugin.loadSettings();
-        plugin.settings.mode = 'Text';
-        plugin.settings.continueListItems = true;
-
-        const file = await lib.createNote({ content: '- Item:\n- ', path: 'list-with-file.md' });
-        const leaf = app.workspace.getLeaf(false);
-        await leaf.openFile(file);
-        const view = app.workspace.getActiveViewOfType(obsidianModule.MarkdownView);
-        const editor = view.editor;
-        editor.focus();
-        editor.setCursor({ ch: 2, line: 1 });
-
-        const dataTransfer = new DataTransfer();
-        dataTransfer.setData('text/plain', 'Attachment description');
-
-        const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-        const pngBytes = atob(pngBase64);
-        const bytes = new Uint8Array(pngBytes.length);
-        for (let i = 0; i < pngBytes.length; i++) {
-          bytes[i] = pngBytes.charCodeAt(i);
-        }
-        const imgFile = new File([bytes], 'test.png', { type: 'image/png' });
-        dataTransfer.items.add(imgFile);
-
-        const clipboardEvent = new ClipboardEvent('paste', { cancelable: true, clipboardData: dataTransfer });
-        const before = editor.getValue();
-        app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
-
-        await lib.waitUntil({
-          message: 'editor content did not change after paste',
-          predicate: () => editor.getValue() !== before,
-          timeoutInMilliseconds: 10000,
-        });
-
-        return editor.getValue();
+      callback: pasteFilesAndGetResult,
+      input: {
+        clipboardText: 'Attachment description',
+        cursorCh: 2,
+        cursorLine: 1,
+        files: [{ base64: ONE_PIXEL_PNG_BASE64, name: 'test.png' }],
+        initialContent: '- Item:\n- ',
+        mode: 'Text',
+        path: 'list-with-file.md',
+        pluginId,
+        settings: { continueListItems: true },
       },
-      input: { pluginId },
       vaultPath: vault.path,
     });
 
     // Text should have list marker, file link should follow
-    expect(result).toMatch(/- Attachment description\n- !\[\[Pasted image/);
+    expect(result.content).toMatch(/- Attachment description\n- !\[\[Pasted image/);
   });
 
   it('handles pasting into nested list context', async () => {

@@ -1,5 +1,7 @@
 import type { CommonArguments } from 'obsidian-integration-testing';
 
+import type { PastetoIndentationPluginSettings } from '../../main';
+
 /**
  * Input for {@link pasteAndGetResult}. Must stay JSON-serializable, since it
  * crosses the Node -> Obsidian boundary as `input`.
@@ -13,7 +15,7 @@ export interface PasteTestInput {
   cursorCh: number;
   clipboardText?: string;
   clipboardHtml?: string;
-  settings?: Record<string, unknown>;
+  settings?: Partial<PastetoIndentationPluginSettings>;
   /**
    * Whether the paste is expected to change the editor's content. Defaults
    * to `true`. Set to `false` for no-op cases (e.g. Passthrough mode), where
@@ -102,5 +104,112 @@ export const pasteAndGetResult = async ({
   }
 
   return editor.getValue();
+};
+
+/**
+ * Input for {@link pasteFilesAndGetResult}. Must stay JSON-serializable,
+ * since it crosses the Node -> Obsidian boundary as `input` — files are
+ * therefore passed as base64 strings rather than `File`/`Blob` instances.
+ */
+export interface PasteFilesTestInput {
+  pluginId: string;
+  mode: string;
+  path: string;
+  initialContent?: string;
+  cursorLine: number;
+  cursorCh: number;
+  clipboardText?: string;
+  settings?: Partial<PastetoIndentationPluginSettings>;
+  /** Files to add to the clipboard's `DataTransfer.items`, simulating a pasted file/image. */
+  files: { base64: string; name: string; type?: string }[];
+}
+
+/**
+ * Like {@link pasteAndGetResult}, but simulates pasting one or more files
+ * (e.g. images) via the clipboard's `DataTransfer.items`, instead of plain
+ * text/HTML. Returns the resulting note content, the paths of any
+ * `![[...]]`/`![...](...)` attachment links found in it, and whether every
+ * one of those linked files actually exists in the vault.
+ *
+ * This function must remain self-contained (no references outside its own
+ * parameters): it is serialized with `toString()` and executed inside the
+ * real Obsidian instance.
+ */
+export const pasteFilesAndGetResult = async ({
+  app,
+  lib,
+  obsidianModule,
+  pluginId,
+  mode,
+  path,
+  initialContent,
+  cursorLine,
+  cursorCh,
+  clipboardText,
+  settings,
+  files,
+}: CommonArguments & PasteFilesTestInput): Promise<{
+  content: string;
+  linkedPaths: string[];
+  allAttachmentsExist: boolean;
+}> => {
+  const plugin = (app as any).plugins.plugins[pluginId];
+  // See the matching comment in pasteAndGetResult: the plugin instance (and
+  // its settings) is shared across the whole test run, so settings must be
+  // reset before applying this test's overrides.
+  await plugin.loadSettings();
+  if (settings) {
+    Object.assign(plugin.settings, settings);
+  }
+  plugin.settings.mode = mode;
+
+  const file = await lib.createNote({ path, content: initialContent ?? '' });
+  const leaf = app.workspace.getLeaf(false);
+  await leaf.openFile(file);
+
+  const view = app.workspace.getActiveViewOfType(obsidianModule.MarkdownView);
+  if (!view) {
+    throw new Error('No active MarkdownView after opening file');
+  }
+  const editor = view.editor;
+  editor.focus();
+  editor.setCursor({ line: cursorLine, ch: cursorCh });
+
+  const dataTransfer = new DataTransfer();
+  if (clipboardText !== undefined) {
+    dataTransfer.setData('text/plain', clipboardText);
+  }
+  for (const { base64, name, type } of files) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    dataTransfer.items.add(new File([bytes], name, { type: type ?? 'image/png' }));
+  }
+
+  const clipboardEvent = new ClipboardEvent('paste', {
+    cancelable: true,
+    clipboardData: dataTransfer,
+  });
+
+  const before = editor.getValue();
+  app.workspace.trigger('editor-paste', clipboardEvent, editor, view);
+
+  await lib.waitUntil({
+    message: 'editor content did not change after file paste',
+    predicate: () => editor.getValue() !== before,
+    timeoutInMilliseconds: 10000,
+  });
+
+  const content = editor.getValue();
+  const linkedPaths = [
+    ...[...content.matchAll(/!\[\[([^\]]+)\]\]/g)].map((match) => match[1]),
+    ...[...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((match) => decodeURIComponent(match[1])),
+  ];
+  const allAttachmentsExist =
+    linkedPaths.length > 0 && linkedPaths.every((linkedPath) => app.vault.getAbstractFileByPath(linkedPath) !== null);
+
+  return { content, linkedPaths, allAttachmentsExist };
 };
 
