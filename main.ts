@@ -8,12 +8,14 @@ import {
   FileSystemAdapter,
   FuzzySuggestModal,
   htmlToMarkdown,
+  MarkdownFileInfo,
   MarkdownView,
   Notice,
   Platform,
   Plugin,
   PluginSettingTab,
   Setting,
+  TFile,
 } from "obsidian";
 
 import {
@@ -121,7 +123,7 @@ const createTFileObject = async (
   arrayBuffer: ArrayBuffer,
   app: App
 ) => {
-  let tfileObject = await app.vault.createBinary(fileName, arrayBuffer);
+  let tfileObject: TFile | null = await app.vault.createBinary(fileName, arrayBuffer);
 
   // Per the API spec (https://github.com/obsidianmd/obsidian-api/blob/master/obsidian.d.ts#L3626),
   // createBinary() is supposed to return a Promise<TFile>, but seems
@@ -173,7 +175,7 @@ const createAttachmentFileName = (extension: string): string => {
 
 class PasteModeModal extends FuzzySuggestModal<number> {
   public readonly onChooseItem: (item: number) => void;
-  public readonly currentValue: Mode;
+  public readonly currentValue: Mode | null;
   public readonly showCurrentValue: boolean;
   public readonly clipboardReadWorks: boolean;
   public readonly showPassthroughMode: boolean;
@@ -188,13 +190,15 @@ class PasteModeModal extends FuzzySuggestModal<number> {
   }: {
     app: App;
     onChooseItem: (patternIndex: number) => void;
-    currentValue: Mode;
+    currentValue: Mode | null;
     showCurrentValue: boolean;
     clipboardReadWorks: boolean;
     showPassthroughMode: boolean;
   }) {
     super(app);
 
+    this.currentValue = currentValue;
+    this.showCurrentValue = showCurrentValue;
     this.clipboardReadWorks = clipboardReadWorks;
     this.showPassthroughMode = showPassthroughMode;
 
@@ -277,9 +281,9 @@ for (const [key, value] of Object.entries(pluginIcons)) {
 }
 
 export default class PastetoIndentationPlugin extends Plugin {
-  settings: PastetoIndentationPluginSettings;
-  statusBar: HTMLElement;
-  clipboardReadWorks: boolean;
+  settings!: PastetoIndentationPluginSettings;
+  statusBar!: HTMLElement;
+  clipboardReadWorks!: boolean;
 
   private getIconName(baseName: string): string {
     if (!this.app.isDarkMode()) {
@@ -313,6 +317,10 @@ export default class PastetoIndentationPlugin extends Plugin {
             return;
           }
 
+          if (!evt.clipboardData) {
+            return;
+          }
+
           let mode = this.settings.mode;
 
           if (mode === Mode.Passthrough) {
@@ -335,7 +343,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           const files = evt.clipboardData.files;
           const fileLinks: string[] = [];
           const activeFile = app.workspace.getActiveFile();
-          const activeFilePath = activeFile?.path;
+          const activeFilePath = activeFile?.path ?? "";
 
           for (const fileObject of files) {
             const fileName = await app.fileManager.getAvailablePathForAttachment(
@@ -383,7 +391,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             for (const [i, el] of srcContainingElements.entries()) {
               const src = el.getAttr("src");
-              if (!srcRegex || !srcRegex.test(src)) {
+              if (!src || !srcRegex || !srcRegex.test(src)) {
                 continue;
               }
 
@@ -429,6 +437,10 @@ export default class PastetoIndentationPlugin extends Plugin {
                   await getBlobArrayBuffer(dataBlob),
                   app
                 );
+
+                if (!tfileObject) {
+                  continue;
+                }
 
                 const encodedPath = encodeURI(tfileObject.path);
                 el.setAttr("src", encodedPath);
@@ -486,6 +498,10 @@ export default class PastetoIndentationPlugin extends Plugin {
 
             // Reverse so string replacements don't invalidate later indices:
             for (const image of images.reverse()) {
+              if (!image.groups) {
+                continue;
+              }
+
               const imageFileName = await app.fileManager.getAvailablePathForAttachment(
                 createAttachmentFileName(image.groups.extension),
                 activeFilePath
@@ -687,7 +703,10 @@ export default class PastetoIndentationPlugin extends Plugin {
         id: `paste-in-mode-${key}`,
         icon: this.getIconName(`pasteIcons-${key}-hourglass`),
         name: `Paste in ${value} Mode`,
-        editorCallback: async (editor: Editor, view: MarkdownView) => {
+        editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+          if (!(view instanceof MarkdownView)) {
+            return;
+          }
           await pasteInMode(value, editor, view);
         },
       });
@@ -747,7 +766,10 @@ export default class PastetoIndentationPlugin extends Plugin {
       id: "paste-in-mode-interactive",
       icon: this.getIconName("pasteIcons-clipboard-question"),
       name: "Paste in Mode (Interactive)",
-      editorCallback: async (editor: Editor, view: MarkdownView) => {
+      editorCallback: async (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+        if (!(view instanceof MarkdownView)) {
+          return;
+        }
         const newMode = new PasteModeModal({
           app,
           onChooseItem: async (item: number): Promise<void> => {
