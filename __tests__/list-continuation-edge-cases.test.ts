@@ -1,0 +1,250 @@
+import { describe, expect, it } from '@jest/globals';
+import { evalInObsidian } from 'obsidian-integration-testing';
+import { getTemporaryVault } from 'obsidian-integration-testing/jest-global-setup-plugin';
+
+import { ONE_PIXEL_PNG_BASE64 } from './helpers/fixtures';
+import { pasteAndGetResult, pasteFilesAndGetResult } from './helpers/e2e-paste';
+
+describe('list continuation edge cases', () => {
+  const vault = getTemporaryVault();
+  const pluginId = 'obsidian-paste-to-current-indentation';
+
+  it('continues bullet lists with unchecked checkboxes', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Task two\nTask three',
+        cursorCh: 6,
+        cursorLine: 1,
+        initialContent: '- [ ] Task one\n- [ ] ',
+        mode: 'Text',
+        path: 'list-checkbox-unchecked.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('- [ ] Task one\n- [ ] Task two\n- [ ] Task three');
+  });
+
+  it('continues bullet lists with checked checkboxes', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Task two\nTask three',
+        cursorCh: 6,
+        cursorLine: 1,
+        initialContent: '- [x] Task one\n- [x] ',
+        mode: 'Text',
+        path: 'list-checkbox-checked.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('- [x] Task one\n- [x] Task two\n- [x] Task three');
+  });
+
+  it('continues bullet lists with uppercase X in checkbox', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Done two',
+        cursorCh: 6,
+        cursorLine: 1,
+        initialContent: '- [X] Done one\n- [X] ',
+        mode: 'Text',
+        path: 'list-checkbox-uppercase-x.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('- [X] Done one\n- [X] Done two');
+  });
+
+  it('handles empty lines within pasted content going into list', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Item two\n\nItem three',
+        cursorCh: 2,
+        cursorLine: 1,
+        initialContent: '- Item one\n- ',
+        mode: 'Text',
+        path: 'list-empty-lines.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    // Empty lines might break list continuation - verify behavior
+    const lines = result.split('\n');
+    expect(lines[0]).toBe('- Item one');
+    expect(lines[1]).toMatch(/^- Item two/);
+  });
+
+  it('continues list with different bullet markers (- vs * vs +)', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Item two\nItem three',
+        cursorCh: 2,
+        cursorLine: 1,
+        initialContent: '* Item one\n* ',
+        mode: 'Text',
+        path: 'list-asterisk-marker.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('* Item one\n* Item two\n* Item three');
+  });
+
+  it('continues list with plus marker', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Item two\nItem three',
+        cursorCh: 2,
+        cursorLine: 1,
+        initialContent: '+ Item one\n+ ',
+        mode: 'Text',
+        path: 'list-plus-marker.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('+ Item one\n+ Item two\n+ Item three');
+  });
+
+  it('increments numbered list starting from different numbers', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Item\nAnother',
+        cursorCh: 3,
+        cursorLine: 1,
+        initialContent: '5. First\n5. ',
+        mode: 'Text',
+        path: 'list-numbered-start.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('5. First\n6. Item\n7. Another');
+  });
+
+  it('handles numbered list with checkboxes', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Task two\nTask three',
+        cursorCh: 7,
+        cursorLine: 1,
+        initialContent: '1. [ ] Task one\n1. [ ] ',
+        mode: 'Text',
+        path: 'list-numbered-checkbox.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('1. [ ] Task one\n2. [ ] Task two\n3. [ ] Task three');
+  });
+
+  it('applies list continuation with indentation', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Nested two\nNested three',
+        cursorCh: 4,
+        cursorLine: 1,
+        initialContent: '  - Parent\n  - ',
+        mode: 'Text',
+        path: 'list-indented-nested.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    expect(result).toBe('  - Parent\n  - Nested two\n  - Nested three');
+  });
+
+  it('does not continue list when marker is not immediately followed by space', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Line one\nLine two',
+        cursorCh: 8,
+        cursorLine: 0,
+        initialContent: '-Content',
+        mode: 'Text',
+        path: 'list-no-space-marker.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    // "-Content" has no space after the "-", so it is not a valid list
+    // marker: the second pasted line should not gain a "-" prefix (though
+    // it still gets generic alignment whitespace, capped at 3 characters,
+    // matching the plugin's general continuation-indentation behavior).
+    expect(result).toBe('-ContentLine one\n   Line two');
+  });
+
+  it('only applies list marker to lines within the pasted content, not file links', async () => {
+    const result = await evalInObsidian({
+      callback: pasteFilesAndGetResult,
+      input: {
+        clipboardText: 'Attachment description',
+        cursorCh: 2,
+        cursorLine: 1,
+        files: [{ base64: ONE_PIXEL_PNG_BASE64, name: 'test.png' }],
+        initialContent: '- Item:\n- ',
+        mode: 'Text',
+        path: 'list-with-file.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    // Text should have list marker, file link should follow
+    expect(result.content).toMatch(/- Attachment description\n- !\[\[Pasted image/);
+  });
+
+  it('handles pasting into nested list context', async () => {
+    const result = await evalInObsidian({
+      callback: pasteAndGetResult,
+      input: {
+        clipboardText: 'Sub-item two',
+        cursorCh: 5,
+        cursorLine: 2,
+        initialContent: '1. Main\n   - Sub-item one\n   - ',
+        mode: 'Text',
+        path: 'list-nested-complex.md',
+        pluginId,
+        settings: { continueListItems: true },
+      },
+      vaultPath: vault.path,
+    });
+
+    // Should preserve nested structure
+    expect(result).toMatch(/1\. Main/);
+    expect(result).toMatch(/- Sub-item two/);
+  });
+});

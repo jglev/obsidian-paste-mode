@@ -1,0 +1,30 @@
+.paste-mode-settings-notice {
+  color: var(--text-error);
+  font-weight: bold;
+}
+
+.paste-mode-settings-notice-text {
+  font-style: italic;
+}
+
+.primed .paste-mode-settings-delete-button {
+  background: var(--text-error) !important;
+  color: white !important;
+}
+.attachment-override {
+  border-bottom: 5px double var(--background-modifier-border);
+  padding: 0.5em 0 0.5em 0;
+  margin: 0.5em 0 0.5em 0
+}
+
+.attachment-override:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+}
+.setting-item {
+  opacity: 100%;
+}
+
+.setting-item.is-disabled {
+  opacity: 60%;
+}
