@@ -1317,22 +1317,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/lodash.clonedeep@npm:^4.5.7":
-  version: 4.5.9
-  resolution: "@types/lodash.clonedeep@npm:4.5.9"
-  dependencies:
-    "@types/lodash": "npm:*"
-  checksum: 10c0/2f224ce9578046bccd1cd9594fb73540600ebd3d59a45695166a6123e2c376b84ab106b005a00453f357907f25bc8bfd2271b822be76e8f5527eadb4690b5e96
-  languageName: node
-  linkType: hard
-
-"@types/lodash@npm:*":
-  version: 4.17.25
-  resolution: "@types/lodash@npm:4.17.25"
-  checksum: 10c0/ca2049f16bf527e04d6e27702e3912a484faaff587de77a5c58e0d243b9292a655e1d7f7e5bdf2ffdf49a76da10673097f8dd4901990679058d47ccd99051877
-  languageName: node
-  linkType: hard
-
 "@types/node@npm:*, @types/node@npm:^14.14.37":
   version: 14.18.63
   resolution: "@types/node@npm:14.18.63"
@@ -2096,13 +2080,6 @@ __metadata:
     base64-js: "npm:^1.3.1"
     ieee754: "npm:^1.2.1"
   checksum: 10c0/2a905fbbcde73cc5d8bd18d1caa23715d5f83a5935867c2329f0ac06104204ba7947be098fe1317fbd8830e26090ff8e764f08cd14fefc977bb248c3487bcbd0
-  languageName: node
-  linkType: hard
-
-"builtin-modules@npm:^5.3.0":
-  version: 5.3.0
-  resolution: "builtin-modules@npm:5.3.0"
-  checksum: 10c0/0251cf1bb44494353669de425fd7db2211338eecda1dafb04c7b64f57f5b0a738188cdfa854c7f82453df5ee9220537ad268c5f1d1ded873b65b8107928155f0
   languageName: node
   linkType: hard
 
@@ -4248,13 +4225,10 @@ __metadata:
   dependencies:
     "@jest/globals": "npm:^30.5.1"
     "@types/jest": "npm:^26.0.24"
-    "@types/lodash.clonedeep": "npm:^4.5.7"
     "@types/node": "npm:^14.14.37"
     "@xmldom/xmldom": "npm:^0.9.12"
-    builtin-modules: "npm:^5.3.0"
     esbuild: "npm:^0.28.2"
     jest: "npm:^30.5.1"
-    lodash.clonedeep: "npm:^4.5.0"
     obsidian: "npm:^1.1.1"
     obsidian-integration-testing: "npm:^12.0.0"
     ts-jest: "npm:^29.4.12"

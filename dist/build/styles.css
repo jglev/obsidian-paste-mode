@@ -7,9 +7,13 @@
   font-style: italic;
 }
 
-.primed .paste-mode-settings-delete-button {
-  background: var(--text-error) !important;
-  color: white !important;
+.paste-mode-status-bar-hidden {
+  display: none;
+}
+
+.primed .paste-mode-settings-delete-button.paste-mode-settings-delete-button {
+  background: var(--text-error);
+  color: white;
 }
 .attachment-override {
   border-bottom: 5px double var(--background-modifier-border);

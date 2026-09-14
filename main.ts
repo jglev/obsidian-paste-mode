@@ -14,6 +14,7 @@ import {
   Platform,
   Plugin,
   PluginSettingTab,
+  requestUrl,
   Setting,
   TFile,
 } from "obsidian";
@@ -38,8 +39,6 @@ enum Mode {
 const MODE_VALUES = Object.values(Mode);
 const MODE_ENTRIES = Object.entries(Mode);
 
-const CURRENT_FILE_PLACEHOLDER = "{current}";
-
 const LEADING_WHITESPACE_REGEX = /^(\s*)(.*)/;
 
 const timestamp = () => {
@@ -54,7 +53,7 @@ const isURL = (str: string): boolean => {
   try {
     new URL(str);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
@@ -106,10 +105,8 @@ const updateStatusBar = (
   mode: Mode,
   displayMode: string
 ) => {
-  if (displayMode === "hidden") {
-    statusBar.style.display = "none";
-  } else {
-    statusBar.style.display = "";
+  statusBar.toggleClass("paste-mode-status-bar-hidden", displayMode === "hidden");
+  if (displayMode !== "hidden") {
     if (displayMode === "shortened") {
       statusBar.textContent = "PM: " + (StatusBarLabel[mode] || mode);
     } else {
@@ -130,20 +127,12 @@ const createTFileObject = async (
   // at least currently to return a Promise<null>, so we handle that
   // here:
   if (tfileObject === null) {
-    console.log(
-      "Paste Mode: Waiting for pasted file to become available..."
-    );
     // Wait for the Obsidian metadata cache to catch up to the
     // newly-created file. Per https://discord.com/channels/686053708261228577/840286264964022302/1038065182812942417,
     // there is currently no way to force a metadata cache refresh,
     // unfortunately.
     let nFileTries = 0;
     while (!tfileObject && nFileTries < 30) {
-      if (nFileTries > 0) {
-        console.log(
-          `Paste Mode: Waiting for pasted file to become available... (attempt ${nFileTries + 1})`
-        );
-      }
       if (nFileTries === 10) {
         new Notice(
           `Paste Mode: Waiting for pasted file to become available...`
@@ -154,7 +143,7 @@ const createTFileObject = async (
 
       nFileTries += 1;
       if (!tfileObject) {
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => window.setTimeout(r, 100));
       }
     }
   }
@@ -174,7 +163,7 @@ const createAttachmentFileName = (extension: string): string => {
 };
 
 class PasteModeModal extends FuzzySuggestModal<number> {
-  public readonly onChooseItem: (item: number) => void;
+  public readonly onChooseItem: (item: number) => void | Promise<void>;
   public readonly currentValue: Mode | null;
   public readonly showCurrentValue: boolean;
   public readonly clipboardReadWorks: boolean;
@@ -189,7 +178,7 @@ class PasteModeModal extends FuzzySuggestModal<number> {
     showPassthroughMode,
   }: {
     app: App;
-    onChooseItem: (patternIndex: number) => void;
+    onChooseItem: (patternIndex: number) => void | Promise<void>;
     currentValue: Mode | null;
     showCurrentValue: boolean;
     clipboardReadWorks: boolean;
@@ -214,7 +203,7 @@ class PasteModeModal extends FuzzySuggestModal<number> {
     ]);
 
     this.onChooseItem = (patternIndex: number) => {
-      onChooseItem(patternIndex);
+      void onChooseItem(patternIndex);
       // Note: Using this.close() here was causing a bug whereby new
       // text was unable to be typed until the user had opened another
       // modal or switched away from the window. @lishid noted at
@@ -389,7 +378,7 @@ export default class PastetoIndentationPlugin extends Plugin {
               }
             }
 
-            for (const [i, el] of srcContainingElements.entries()) {
+            for (const el of srcContainingElements) {
               const src = el.getAttr("src");
               if (!src || !srcRegex || !srcRegex.test(src)) {
                 continue;
@@ -419,9 +408,13 @@ export default class PastetoIndentationPlugin extends Plugin {
                   // Guard against network requests that hang or fail (e.g.
                   // unreachable hosts), so a single bad `src` doesn't leave
                   // the whole paste stuck:
-                  dataBlob = await (
-                    await fetch(src, { signal: AbortSignal.timeout(5000) })
-                  ).blob();
+                  const response = await Promise.race([
+                    requestUrl({ url: src }),
+                    new Promise<never>((_resolve, reject) =>
+                      window.setTimeout(() => reject(new Error("Timed out")), 5000)
+                    ),
+                  ]);
+                  dataBlob = new Blob([response.arrayBuffer]);
                 }
 
                 if (!dataBlob) {
@@ -492,7 +485,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           ) {
             const images = [
               ...clipboardContents.matchAll(
-                /data:image\/(?<extension>.*?);base64,\s*(?<data>[A-Za-z0-9\+\/]*)\b={0,2}/g
+                /data:image\/(?<extension>.*?);base64,\s*(?<data>[A-Za-z0-9+/]*)\b={0,2}/g
               ),
             ];
 
@@ -647,7 +640,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       this.addCommand({
         id: `set-paste-mode-${key}`,
         icon: this.getIconName(`pasteIcons-${key}`),
-        name: `Set Paste Mode to ${value}`,
+        name: `Set mode to ${value}`,
         callback: () => changePasteMode(value),
       });
     });
@@ -661,7 +654,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       // for requesting access to the .read() (vs. .readText())
       // clipboard method:
       const originalMode = this.settings.mode;
-      changePasteMode(value);
+      await changePasteMode(value);
       const transfer = new DataTransfer();
       if (this.clipboardReadWorks) {
         const clipboardData = await navigator.clipboard.read();
@@ -684,7 +677,7 @@ export default class PastetoIndentationPlugin extends Plugin {
         editor,
         view
       );
-      changePasteMode(originalMode);
+      await changePasteMode(originalMode);
     };
 
     MODE_ENTRIES.forEach(([key, value]) => {
@@ -715,7 +708,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: `cycle-paste-mode`,
       icon: this.getIconName(`pasteIcons-clipboard-cycle`),
-      name: `Cycle Paste Mode`,
+      name: `Cycle mode`,
       callback: async () => {
         const currentIndex = MODE_VALUES.indexOf(this.settings.mode);
         const nextIndex = (currentIndex + 1) % MODE_VALUES.length;
@@ -736,7 +729,7 @@ export default class PastetoIndentationPlugin extends Plugin {
           return false;
         }
         if (!checking) {
-          toggleQuoteInEditor(view, this.settings.blockquotePrefix);
+          void toggleQuoteInEditor(view, this.settings.blockquotePrefix);
         }
         return true;
       },
@@ -745,7 +738,7 @@ export default class PastetoIndentationPlugin extends Plugin {
     this.addCommand({
       id: "set-paste-mode",
       icon: this.getIconName("pasteIcons-clipboard-question"),
-      name: "Set paste mode",
+      name: "Set mode",
       callback: () => {
         const newMode = new PasteModeModal({
           app,
@@ -810,7 +803,7 @@ export default class PastetoIndentationPlugin extends Plugin {
 
     if (!Object.values(Mode).includes(this.settings.mode)) {
       this.settings.mode = Object.values(Mode)[0];
-      this.saveSettings();
+      await this.saveSettings();
     }
   }
 
@@ -839,7 +832,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       return output;
     }
     const indices = [...output.matchAll(regex)]
-      .map((x) => x.index!)
+      .map((x) => x.index)
       .reverse();
 
     for (const index of indices) {
@@ -865,7 +858,7 @@ export default class PastetoIndentationPlugin extends Plugin {
       return output;
     }
     const indices = [...output.matchAll(regex)]
-      .map((x) => x.index!)
+      .map((x) => x.index)
       .reverse();
 
     for (const index of indices) {
@@ -896,7 +889,7 @@ class SettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Paste Mode" });
+    new Setting(containerEl).setName("Paste Mode").setHeading();
 
     if (!this.plugin.clipboardReadWorks) {
       const noticeDiv = containerEl.createDiv();
@@ -933,7 +926,7 @@ class SettingTab extends PluginSettingTab {
       .setDesc(
         "How to display the current paste mode in the status bar."
       )
-      .addDropdown((dropdown: any) =>
+      .addDropdown((dropdown) =>
         dropdown
           .addOption("original", "Original (Paste Mode: ...)")
           .addOption("shortened", "Shortened (PM: ...)")
