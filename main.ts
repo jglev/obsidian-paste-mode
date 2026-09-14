@@ -50,6 +50,16 @@ const isURL = (str: string): boolean => {
   if (str.startsWith("app://")) {
     return false;
   }
+  // A string containing whitespace (including newlines) is not "just a
+  // URL". Without this check, `new URL()` happily parses many everyday
+  // strings as valid "opaque" URLs whenever they contain a colon (e.g.
+  // "From: <name@example.com>", "Subject: Re: Example", or even multi-line
+  // text, since the URL parser strips embedded newlines/tabs before
+  // parsing) — which caused pasted text like email headers to be
+  // misidentified as URLs and silently skipped entirely.
+  if (/\s/.test(str)) {
+    return false;
+  }
   try {
     new URL(str);
     return true;
