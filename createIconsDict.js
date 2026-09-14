@@ -1,13 +1,13 @@
-var DOMParser = require('@xmldom/xmldom').DOMParser;
+let DOMParser = require('@xmldom/xmldom').DOMParser;
 const fs = require('fs');
-var path = require('path');
+let path = require('path');
 
 const iconFiles = fs.readdirSync(path.join('icons', 'individual-icons')).filter(f => f.endsWith('.svg'));
 const darkIconFiles = fs.readdirSync(path.join('icons', 'individual-icons', 'dark')).filter(f => f.endsWith('.svg'));
 
 const iconsDict = {};
 
-var parser = new DOMParser();
+let parser = new DOMParser();
 
 for (const f of iconFiles) {
   const contents = fs.readFileSync(path.join('icons', 'individual-icons', f)).toString();
