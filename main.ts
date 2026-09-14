@@ -15,7 +15,7 @@ import {
   Plugin,
   PluginSettingTab,
   requestUrl,
-  Setting,
+  SettingDefinitionItem,
   TFile,
 } from "obsidian";
 
@@ -422,7 +422,7 @@ export default class PastetoIndentationPlugin extends Plugin {
                 }
 
                 const fileName = await app.fileManager.getAvailablePathForAttachment(
-                  createAttachmentFileName(src.split(".").pop()!),
+                  createAttachmentFileName(src.split(".").pop() ?? ""),
                   activeFilePath
                 );
                 const tfileObject = await createTFileObject(
@@ -884,196 +884,220 @@ class SettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  display(): void {
-    let { containerEl } = this;
+  getControlValue(key: string): unknown {
+    switch (key) {
+      case "statusBarDisplay":
+        return (
+          this.plugin.settings.statusBarDisplay ||
+          DEFAULT_SETTINGS.statusBarDisplay
+        );
+      case "blockquotePrefix":
+        return this.plugin.settings.blockquotePrefix ===
+          DEFAULT_SETTINGS.blockquotePrefix
+          ? ""
+          : this.plugin.settings.blockquotePrefix;
+      case "blockquoteEscapeCharactersRegex":
+        return (
+          this.plugin.settings.blockquoteEscapeCharactersRegex ||
+          defaultBlockquoteEscapeCharacters
+        );
+      case "nonBlockquoteEscapeCharactersRegex":
+        return (
+          this.plugin.settings.nonBlockquoteEscapeCharactersRegex ||
+          defaultNonBlockquoteEscapeCharacters
+        );
+      case "srcAttributeCopyRegex":
+        return (
+          this.plugin.settings.srcAttributeCopyRegex ||
+          defaultSrcAttributeCopyRegex
+        );
+      default:
+        return super.getControlValue(key);
+    }
+  }
 
-    containerEl.empty();
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    switch (key) {
+      case "mode":
+        this.plugin.settings.mode = value as Mode;
+        await this.plugin.saveSettings();
+        updateStatusBar(
+          this.plugin.statusBar,
+          this.plugin.settings.mode,
+          this.plugin.settings.statusBarDisplay
+        );
+        return;
+      case "statusBarDisplay":
+        this.plugin.settings.statusBarDisplay = value as string;
+        await this.plugin.saveSettings();
+        updateStatusBar(
+          this.plugin.statusBar,
+          this.plugin.settings.mode,
+          value as string
+        );
+        return;
+      case "blockquotePrefix":
+        this.plugin.settings.blockquotePrefix =
+          (value as string) !== ""
+            ? (value as string)
+            : DEFAULT_SETTINGS.blockquotePrefix;
+        await this.plugin.saveSettings();
+        return;
+      case "blockquoteEscapeCharactersRegex":
+        this.plugin.settings.blockquoteEscapeCharactersRegex =
+          (value as string) || defaultBlockquoteEscapeCharacters;
+        await this.plugin.saveSettings();
+        return;
+      case "nonBlockquoteEscapeCharactersRegex":
+        this.plugin.settings.nonBlockquoteEscapeCharactersRegex =
+          (value as string) || defaultNonBlockquoteEscapeCharacters;
+        await this.plugin.saveSettings();
+        return;
+      case "srcAttributeCopyRegex":
+        this.plugin.settings.srcAttributeCopyRegex =
+          (value as string) || defaultSrcAttributeCopyRegex;
+        await this.plugin.saveSettings();
+        return;
+      case "escapeCharactersInBlockquotes":
+      case "escapeCharactersInNonBlockquotes":
+        await super.setControlValue(key, value);
+        this.update();
+        return;
+      default:
+        await super.setControlValue(key, value);
+        return;
+    }
+  }
 
-    new Setting(containerEl).setName("Paste Mode").setHeading();
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const definitions: SettingDefinitionItem[] = [];
 
     if (!this.plugin.clipboardReadWorks) {
-      const noticeDiv = containerEl.createDiv();
-      noticeDiv
-        .createEl("span", { text: "Notice: " })
-        .addClass("paste-mode-settings-notice");
-      noticeDiv
-        .createEl("span", {
-          text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentOverrideLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
-        })
-        .addClass("paste-mode-settings-notice-text");
+      definitions.push({
+        name: "",
+        searchable: false,
+        render: (setting) => {
+          setting.settingEl.empty();
+          const noticeDiv = setting.settingEl.createDiv();
+          noticeDiv.createEl("span", {
+            text: "Notice: ",
+            cls: "paste-mode-settings-notice",
+          });
+          noticeDiv.createEl("span", {
+            text: `The "Paste in Markdown Mode" and "Paste in Markdown (Blockquote) Mode" attachmentOverrideLocations have been disabled, because reading non-text data from the clipboad does not work with this version of Obsidian.`,
+            cls: "paste-mode-settings-notice-text",
+          });
+        },
+      });
     }
 
-    new Setting(containerEl)
-      .setName("Paste Mode")
-      .setDesc("Mode that the paste command will invoke.")
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption(Mode.Text, "Plain Text")
-          .addOption(Mode.TextBlockquote, "Plain Text (Blockquote)")
-          .addOption(Mode.Markdown, "Markdown")
-          .addOption(Mode.MarkdownBlockquote, "Markdown (Blockquote)")
-          .addOption(Mode.Passthrough, "Passthrough")
-          .setValue(this.plugin.settings.mode)
-          .onChange(async (value) => {
-            this.plugin.settings.mode = value as Mode;
-            await this.plugin.saveSettings();
-            updateStatusBar(this.plugin.statusBar, this.plugin.settings.mode, this.plugin.settings.statusBarDisplay);
-          })
-      );
+    definitions.push(
+      {
+        name: "Paste Mode",
+        desc: "Mode that the paste command will invoke.",
+        control: {
+          type: "dropdown",
+          key: "mode",
+          defaultValue: DEFAULT_SETTINGS.mode,
+          options: {
+            [Mode.Text]: "Plain Text",
+            [Mode.TextBlockquote]: "Plain Text (Blockquote)",
+            [Mode.Markdown]: "Markdown",
+            [Mode.MarkdownBlockquote]: "Markdown (Blockquote)",
+            [Mode.Passthrough]: "Passthrough",
+          },
+        },
+      },
+      {
+        name: "Status bar display",
+        desc: "How to display the current paste mode in the status bar.",
+        control: {
+          type: "dropdown",
+          key: "statusBarDisplay",
+          defaultValue: DEFAULT_SETTINGS.statusBarDisplay,
+          options: {
+            original: "Original (Paste Mode: ...)",
+            shortened: "Shortened (PM: ...)",
+            hidden: "Hidden",
+          },
+        },
+      },
+      {
+        name: "Save base64-encoded files",
+        desc: "When pasting in Text, Text (Blockquote), Markdown, or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file.",
+        control: {
+          type: "toggle",
+          key: "saveBase64EncodedFiles",
+          defaultValue: DEFAULT_SETTINGS.saveBase64EncodedFiles,
+        },
+      },
+      {
+        name: "Blockquote Prefix",
+        desc: "Markdown syntax to signify that a line is part of a blockquote.",
+        control: {
+          type: "text",
+          key: "blockquotePrefix",
+          placeholder: ">•",
+        },
+      },
+      {
+        name: "Continue list items",
+        desc: "When pasting multiple lines into a list item where all lines are at the same indentation level, add list markers to each pasted line to continue the list.",
+        control: {
+          type: "toggle",
+          key: "continueListItems",
+          defaultValue: DEFAULT_SETTINGS.continueListItems,
+        },
+      },
+      {
+        name: "Escape characters in blockquotes",
+        desc: "When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of specific characters.",
+        control: {
+          type: "toggle",
+          key: "escapeCharactersInBlockquotes",
+          defaultValue: DEFAULT_SETTINGS.escapeCharactersInBlockquotes,
+        },
+      },
+      {
+        name: "Escape characters regex",
+        desc: "A Regular Expression expressing which characters to escape when pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode.",
+        control: {
+          type: "text",
+          key: "blockquoteEscapeCharactersRegex",
+          placeholder: defaultBlockquoteEscapeCharacters,
+          disabled: () => !this.plugin.settings.escapeCharactersInBlockquotes,
+        },
+      },
+      {
+        name: "Escape characters in normal text",
+        desc: "When pasting in Text or Markdown mode, add a backslash escape character to the beginning of specific characters.",
+        control: {
+          type: "toggle",
+          key: "escapeCharactersInNonBlockquotes",
+          defaultValue: DEFAULT_SETTINGS.escapeCharactersInNonBlockquotes,
+        },
+      },
+      {
+        name: "Escape characters in normal text regex",
+        desc: "A Regular Expression expressing which characters to escape when pasting in Text or Markdown mode.",
+        control: {
+          type: "text",
+          key: "nonBlockquoteEscapeCharactersRegex",
+          placeholder: defaultNonBlockquoteEscapeCharacters,
+          disabled: () =>
+            !this.plugin.settings.escapeCharactersInNonBlockquotes,
+        },
+      },
+      {
+        name: "src attribute copy regex",
+        desc: 'If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.',
+        control: {
+          type: "text",
+          key: "srcAttributeCopyRegex",
+        },
+      }
+    );
 
-    new Setting(containerEl)
-      .setName("Status bar display")
-      .setDesc(
-        "How to display the current paste mode in the status bar."
-      )
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("original", "Original (Paste Mode: ...)")
-          .addOption("shortened", "Shortened (PM: ...)")
-          .addOption("hidden", "Hidden")
-          .setValue(this.plugin.settings.statusBarDisplay || DEFAULT_SETTINGS.statusBarDisplay)
-          .onChange(async (value: string) => {
-            this.plugin.settings.statusBarDisplay = value;
-            await this.plugin.saveSettings();
-            updateStatusBar(this.plugin.statusBar, this.plugin.settings.mode, value);
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Save base64-encoded files")
-      .setDesc(
-        "When pasting in Text, Text (Blockquote), Markdown, or Markdown (Blockquote) mode, save any base64-encoded text as a file, and replace it in the pasted text with a reference to that saved file."
-      )
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.saveBase64EncodedFiles)
-          .onChange(async (value) => {
-            this.plugin.settings.saveBase64EncodedFiles = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Blockquote Prefix")
-      .setDesc(
-        "Markdown syntax to signify that a line is part of a blockquote."
-      )
-      .addText((text) =>
-        text
-          .setPlaceholder(">•")
-          .setValue(
-            this.plugin.settings.blockquotePrefix ===
-              DEFAULT_SETTINGS.blockquotePrefix
-              ? ""
-              : this.plugin.settings.blockquotePrefix
-          )
-          .onChange(async (value) => {
-            this.plugin.settings.blockquotePrefix =
-              value !== "" ? value : DEFAULT_SETTINGS.blockquotePrefix;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Continue list items")
-      .setDesc(
-        "When pasting multiple lines into a list item where all lines are at the same indentation level, add list markers to each pasted line to continue the list."
-      )
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.continueListItems)
-          .onChange(async (value) => {
-            this.plugin.settings.continueListItems = value;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Escape characters in blockquotes")
-      .setDesc(
-        `When pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode, add a backslash escape character to the beginning of specific characters.`
-      )
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.escapeCharactersInBlockquotes)
-          .onChange(async (value) => {
-            this.plugin.settings.escapeCharactersInBlockquotes = value;
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Escape characters regex")
-      .setDesc(
-        `A Regular Expression expressing which characters to escape when pasting in Text (Blockquote), Code Block (Blockquote), or Markdown (Blockquote) mode.`
-      )
-      .setDisabled(!this.plugin.settings.escapeCharactersInBlockquotes)
-      .addText((text) => {
-        text
-          .setValue(
-            this.plugin.settings.blockquoteEscapeCharactersRegex ||
-            defaultBlockquoteEscapeCharacters
-          )
-          .setPlaceholder(defaultBlockquoteEscapeCharacters)
-          .onChange(async (value) => {
-            this.plugin.settings.blockquoteEscapeCharactersRegex =
-              value || defaultBlockquoteEscapeCharacters;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Escape characters in normal text")
-      .setDesc(
-        `When pasting in Text or Markdown mode, add a backslash escape character to the beginning of specific characters.`
-      )
-      .addToggle((toggle) => {
-        toggle
-          .setValue(this.plugin.settings.escapeCharactersInNonBlockquotes)
-          .onChange(async (value) => {
-            this.plugin.settings.escapeCharactersInNonBlockquotes = value;
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("Escape characters in normal text regex")
-      .setDesc(
-        `A Regular Expression expressing which characters to escape when pasting in Text or Markdown mode.`
-      )
-      .setDisabled(!this.plugin.settings.escapeCharactersInNonBlockquotes)
-      .addText((text) => {
-        text
-          .setValue(
-            this.plugin.settings.nonBlockquoteEscapeCharactersRegex ||
-            defaultNonBlockquoteEscapeCharacters
-          )
-          .setPlaceholder(defaultNonBlockquoteEscapeCharacters)
-          .onChange(async (value) => {
-            this.plugin.settings.nonBlockquoteEscapeCharactersRegex =
-              value || defaultNonBlockquoteEscapeCharacters;
-            await this.plugin.saveSettings();
-          });
-      });
-
-    new Setting(containerEl)
-      .setName("src attribute copy regex")
-      .setDesc(
-        `If set, when pasting in Markdown or Markdown (Blockquote) mode, watch for any HTML elements that contain a src attribute. If the src value matches this Regular Expression, copy the file being referenced into the Obsidian vault, and replace the src attribute with a reference to that now-local copy of the file.`
-      )
-      .addText((text) => {
-        text
-          .setValue(
-            this.plugin.settings.srcAttributeCopyRegex ||
-            defaultSrcAttributeCopyRegex
-          )
-          .onChange(async (value) => {
-            this.plugin.settings.srcAttributeCopyRegex =
-              value || defaultSrcAttributeCopyRegex;
-            await this.plugin.saveSettings();
-          });
-      });
+    return definitions;
   }
 }
